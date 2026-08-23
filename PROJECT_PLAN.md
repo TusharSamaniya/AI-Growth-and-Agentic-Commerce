@@ -375,7 +375,7 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 ### Phase 3 — Data layer: catalog & database
 *Goal: products stored in a database and searchable.*
 - **Task 3.1 — Database & Product model**
-  - [ ] Add SQLite via SQLModel
+  - [x] Add SQLite via SQLModel
   - [ ] Define the `Product` model (name, category, price, brand, specs, stock)
   - [ ] Create the database and tables
 - **Task 3.2 — Seed the catalog**
