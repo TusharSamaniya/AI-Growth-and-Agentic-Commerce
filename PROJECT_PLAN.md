@@ -353,13 +353,13 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 - **Task 1.3 — Configuration & secrets**
   - [x] Create a `.env` file (Razorpay keys, model name)
   - [x] Load settings with `pydantic-settings`
-  - [ ] Make sure `.env` is git-ignored
+  - [x] Make sure `.env` is git-ignored
 
 ### Phase 2 — De-risk the external services
 *Goal: prove Razorpay and Ollama work before building on them.*
 - **Task 2.1 — Razorpay test-mode: first order & payment link (throwaway script)**
   - [ ] Create a Razorpay account, switch to **test-mode**, copy test keys
-  - [ ] Install the `razorpay` Python SDK
+  - [x] Install the `razorpay` Python SDK
   - [ ] Script: create an order (amount in **paise**)
   - [ ] Script: create a payment link, open it, pay with a **test card**
   - [ ] Reproduce a **failed** payment with a failure test card
