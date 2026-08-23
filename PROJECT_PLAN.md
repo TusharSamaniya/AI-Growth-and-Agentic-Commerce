@@ -380,9 +380,9 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Create the database and tables
 - **Task 3.2 — Seed the catalog**
   - [x] Write a seed script: a few phones + accessories (screen guard, case)
-  - [ ] Verify the rows exist
+  - [x] Verify the rows exist
 - **Task 3.3 — Catalog API**
-  - [ ] `GET /products` (list all)
+  - [x] `GET /products` (list all)
   - [ ] Filter by `max_price` and `category`
   - [ ] Test the endpoint
 
