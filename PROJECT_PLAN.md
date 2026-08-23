@@ -149,7 +149,7 @@ are all appended to the ledger — demonstrating "one failure handled gracefully
 
 **Component responsibilities**
 - **Agent orchestrator** — runs the LLM loop, decides which tool to call, produces rationales.
-  LLM is accessed through a `LLMProvider` interface so Ollama and hosted models are swappable.
+  LLM is accessed through a `LLMProvider` interface so Groq and other hosted/local models are swappable.
 - **Tools** — typed functions the agent calls. Money-affecting tools (`create_order`) route
   through the governance layer before touching Razorpay.
 - **Governance** — enforces budget cap, confirmation gate, merchant guardrails, and idempotency.
@@ -238,7 +238,7 @@ are all appended to the ledger — demonstrating "one failure handled gracefully
 ## 11. Tech stack
 
 - **Backend:** Python + **FastAPI**, `razorpay` Python SDK, SQLite (via SQLModel/SQLAlchemy).
-- **Agent/LLM:** provider-agnostic layer over **Ollama** (dev) + optional hosted model (demo).
+- **Agent/LLM:** provider-agnostic layer over **Groq** (OpenAI-compatible) + optional local/hosted model.
 - **Realtime:** SSE (simplest) or WebSocket for live payment status.
 - **Frontend:** **React** (Vite), a lightweight chat UI + product cards + audit panel.
 - **Tunneling (if using webhooks):** ngrok or similar.
@@ -250,7 +250,7 @@ are all appended to the ledger — demonstrating "one failure handled gracefully
 
 | Day | Focus | Outcome |
 |---|---|---|
-| **1** | **De-risk + scaffold** | Razorpay test account + keys; manually create an order, generate a payment link, complete a test payment, receive a webhook (via tunnel) *or* confirm status polling. Scaffold FastAPI + React + SQLite. Ollama "hello tool-call" working. |
+| **1** | **De-risk + scaffold** | Razorpay test account + keys; manually create an order, generate a payment link, complete a test payment, receive a webhook (via tunnel) *or* confirm status polling. Scaffold FastAPI + React + SQLite. Groq "hello tool-call" working. |
 | **2** | **Catalog + audit foundation** | Seed phones + accessories; `search_catalog`/`recommend` tools; order data model + state machine; hash-chained audit ledger. |
 | **3** | **Agent happy path** | Orchestrator + all tools wired; conversational flow: intent → recommend → clarify → upsell → **confirmation gate**; budget bounding enforced. |
 | **4** | **Razorpay end-to-end** | create order → payment link → webhook/polling → mark paid → notify agent → confirm; SSE live status. |
@@ -271,7 +271,7 @@ governance, audit trail, or the failure flow — those are the judging bar.)*
 - [ ] Decide **webhook vs polling** (get a tunnel working, or confirm polling status transitions).
 - [ ] Reproduce a **failed** test payment (failure test card) and observe the resulting status/event.
 - [ ] Confirm **capture** behavior (auto vs manual).
-- [ ] Ollama serving a tool-calling model; a trivial `search_catalog` tool call round-trips.
+- [ ] Groq tool-calling model reachable; a trivial `search_catalog` tool call round-trips.
 
 ---
 
@@ -305,7 +305,7 @@ governance, audit trail, or the failure flow — those are the judging bar.)*
   hash-chained.
 - A judge can watch the **failure demo**: payment declines → agent recovers → order confirmed →
   ledger shows no money lost.
-- Runs locally with clear README steps; LLM swappable between Ollama and a hosted model.
+- Runs locally with clear README steps; LLM swappable between Groq and other OpenAI-compatible/local models.
 
 ---
 
@@ -387,11 +387,11 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Test the endpoint
 
 ### Phase 4 — LLM provider layer
-*Goal: a swappable way to talk to the model (Ollama now, hosted later).*
+*Goal: a swappable way to talk to the model (Groq now, other providers later).*
 - **Task 4.1 — Define the `LLMProvider` interface**
-  - [ ] A base class/protocol with a `chat(messages, tools)` method
-- **Task 4.2 — Implement `OllamaProvider`**
-  - [ ] Wrap the Ollama chat API
+  - [x] A base class/protocol with a `chat(messages, tools)` method
+- **Task 4.2 — Implement `GroqProvider`**
+  - [ ] Wrap the Groq chat API
   - [ ] Return a normalized response (text + any tool calls)
 - **Task 4.3 — Simple `/chat` endpoint (no tools yet)**
   - [ ] `POST /chat` → provider → reply
