@@ -351,8 +351,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Add a `GET /health` endpoint
   - [x] Run it and open it in the browser
 - **Task 1.3 — Configuration & secrets**
-  - [ ] Create a `.env` file (Razorpay keys, model name)
-  - [ ] Load settings with `pydantic-settings`
+  - [x] Create a `.env` file (Razorpay keys, model name)
+  - [x] Load settings with `pydantic-settings`
   - [ ] Make sure `.env` is git-ignored
 
 ### Phase 2 — De-risk the external services
