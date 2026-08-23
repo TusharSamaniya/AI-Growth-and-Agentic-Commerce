@@ -7,5 +7,6 @@ uvicorn[standard]
 pydantic-settings
 razorpay
 groq
+openai
 sqlmodel
 pytest

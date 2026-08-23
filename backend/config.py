@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     razorpay_key_secret: str
     groq_api_key: str
     groq_model: str
+    llm_provider: str = "groq"  # which backend get_provider() picks: "groq" or "hosted"
 
 
 # One shared settings object that the rest of the app imports.

@@ -394,10 +394,10 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Wrap the Groq chat API
   - [x] Return a normalized response (text + any tool calls)
 - **Task 4.3 — Simple `/chat` endpoint (no tools yet)**
-  - [ ] `POST /chat` → provider → reply
-  - [ ] Test a basic back-and-forth
+  - [x] `POST /chat` → provider → reply
+  - [x] Test a basic back-and-forth
 - **Task 4.4 — (optional) `HostedProvider` fallback**
-  - [ ] Same interface, hosted model, switch via env var
+  - [x] Same interface, hosted model, switch via env var
 
 ### Phase 5 — The agent & tools (conversational core)
 *Goal: the agent recommends, asks smart questions, and upsells — up to a chosen cart.*
