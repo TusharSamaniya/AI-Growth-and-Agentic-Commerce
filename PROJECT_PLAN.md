@@ -358,10 +358,10 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 ### Phase 2 — De-risk the external services
 *Goal: prove Razorpay and Ollama work before building on them.*
 - **Task 2.1 — Razorpay test-mode: first order & payment link (throwaway script)**
-  - [ ] Create a Razorpay account, switch to **test-mode**, copy test keys
+  - [x] Create a Razorpay account, switch to **test-mode**, copy test keys
   - [x] Install the `razorpay` Python SDK
-  - [ ] Script: create an order (amount in **paise**)
-  - [ ] Script: create a payment link, open it, pay with a **test card**
+  - [x] Script: create an order (amount in **paise**)
+  - [x] Script: create a payment link, open it, pay with a **test card**
   - [ ] Reproduce a **failed** payment with a failure test card
   - [ ] Note capture behavior (auto vs manual)
 - **Task 2.2 — Ollama: first chat & first tool-call**
