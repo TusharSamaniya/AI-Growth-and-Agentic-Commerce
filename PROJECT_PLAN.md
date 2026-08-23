@@ -391,8 +391,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 - **Task 4.1 — Define the `LLMProvider` interface**
   - [x] A base class/protocol with a `chat(messages, tools)` method
 - **Task 4.2 — Implement `GroqProvider`**
-  - [ ] Wrap the Groq chat API
-  - [ ] Return a normalized response (text + any tool calls)
+  - [x] Wrap the Groq chat API
+  - [x] Return a normalized response (text + any tool calls)
 - **Task 4.3 — Simple `/chat` endpoint (no tools yet)**
   - [ ] `POST /chat` → provider → reply
   - [ ] Test a basic back-and-forth
