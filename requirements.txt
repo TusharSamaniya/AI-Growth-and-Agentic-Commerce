@@ -1,0 +1,6 @@
+# Python dependencies for the backend.
+# Install everything with:  pip install -r requirements.txt
+# We add a new line here whenever a task introduces a new package.
+
+fastapi
+uvicorn[standard]

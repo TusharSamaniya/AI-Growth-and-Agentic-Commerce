@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets — NEVER commit these
+.env
+
+# Local SQLite database
+*.db
+*.sqlite3
+
+# Editor / OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Frontend (used from Phase 9 onward)
+node_modules/
+dist/
