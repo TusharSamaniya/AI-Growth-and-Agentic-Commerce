@@ -376,10 +376,10 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 *Goal: products stored in a database and searchable.*
 - **Task 3.1 — Database & Product model**
   - [x] Add SQLite via SQLModel
-  - [ ] Define the `Product` model (name, category, price, brand, specs, stock)
-  - [ ] Create the database and tables
+  - [x] Define the `Product` model (name, category, price, brand, specs, stock)
+  - [x] Create the database and tables
 - **Task 3.2 — Seed the catalog**
-  - [ ] Write a seed script: a few phones + accessories (screen guard, case)
+  - [x] Write a seed script: a few phones + accessories (screen guard, case)
   - [ ] Verify the rows exist
 - **Task 3.3 — Catalog API**
   - [ ] `GET /products` (list all)
