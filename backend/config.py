@@ -7,7 +7,8 @@ class Settings(BaseSettings):
 
     razorpay_key_id: str
     razorpay_key_secret: str
-    ollama_model: str
+    groq_api_key: str
+    groq_model: str
 
 
 # One shared settings object that the rest of the app imports.

@@ -194,21 +194,21 @@ are all appended to the ledger — demonstrating "one failure handled gracefully
 
 ---
 
-## 9. LLM provider decision (Ollama vs hosted)
+## 9. LLM provider decision (Groq)
 
-**Decision: build provider-agnostic; develop on Ollama (free); keep a hosted fallback for the demo.**
+**Decision: build provider-agnostic; use Groq's free, OpenAI-compatible API as the model brain.**
 
 - Define an `LLMProvider` interface (`chat(messages, tools) -> response`). Implementations:
-  - **OllamaProvider** — local, OpenAI-compatible API at `localhost:11434`, **no API key needed**.
-    Use a model with solid tool-calling: **Qwen2.5-7B/14B-Instruct** or **Llama 3.1 8B**.
-    (Rough hardware: 7–8B models want ~8 GB+ VRAM/RAM; 14B wants more.)
-  - **HostedProvider** — a frontier model for maximum tool-calling reliability during the live
-    demo, selected via an env var. Optional but recommended as insurance.
-- **Why agnostic:** the demo hinges on reliable tool-calling and clean conversational
-  recommendations. If a local model struggles with multi-step orchestration, flip one env var
-  to a hosted model without rewriting the app.
-- **Recommendation:** do all week-long development on Ollama to keep cost at zero; A/B test the
-  final demo on both and present with whichever is more reliable on the day.
+  - **GroqProvider** — Groq Cloud, OpenAI-compatible API at `https://api.groq.com/openai/v1`,
+    configured via `GROQ_API_KEY` + `GROQ_MODEL`.
+    Model: **`openai/gpt-oss-20b`** (fast, generous free limits, strong tool-calling).
+    Upgrade to **`openai/gpt-oss-120b`** if multi-step tool-calling needs more reasoning — a one-line `.env` change.
+- **Why Groq:** zero local setup / no GPU, very fast inference, a free tier, and reliable
+  function-calling — ideal for a solo builder on a one-week timeline.
+- **Why still agnostic:** because Groq is OpenAI-compatible, any other OpenAI-compatible provider
+  (or a local Ollama) can be swapped in later by changing the base URL + key — no app rewrite.
+- **Key risk:** tool-calling reliability in multi-step flows → mitigated by tool-calling-strong
+  models (gpt-oss) and keeping the model swappable via `GROQ_MODEL`.
 
 ---
 
@@ -356,18 +356,21 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Make sure `.env` is git-ignored
 
 ### Phase 2 — De-risk the external services
-*Goal: prove Razorpay and Ollama work before building on them.*
+*Goal: prove Razorpay and Groq work before building on them.*
 - **Task 2.1 — Razorpay test-mode: first order & payment link (throwaway script)**
   - [x] Create a Razorpay account, switch to **test-mode**, copy test keys
   - [x] Install the `razorpay` Python SDK
   - [x] Script: create an order (amount in **paise**)
   - [x] Script: create a payment link, open it, pay with a **test card**
-  - [ ] Reproduce a **failed** payment with a failure test card
-  - [ ] Note capture behavior (auto vs manual)
-- **Task 2.2 — Ollama: first chat & first tool-call**
-  - [ ] Install Ollama; pull a tool-calling model (Qwen2.5-Instruct / Llama 3.1 8B)
-  - [ ] Call the chat API from Python
-  - [ ] Get a trivial tool-call working (e.g. a fake `get_time` tool)
+  - [x] Reproduce a **failed** payment with a failure test card
+  - [x] Note capture behavior (auto vs manual)
+    - **Capture** = when money actually moves: `authorized` (bank approved, funds held) → `captured` (funds collected). Uncaptured payments are **auto-refunded within ~3 days**.
+    - **Auto-capture is Razorpay's default** (Dashboard: Account & Settings → Payments Capture). Manual capture needs an API call: `client.payment.capture(payment_id, amount, currency)`.
+    - **Decision: CartPilot uses auto-capture** — the payment is confirmed the instant it succeeds, no `authorized` limbo. We detect success via payment/order `status` + webhook (Phase 7).
+- **Task 2.2 — Groq: first chat & first tool-call**
+  - [x] Set up Groq: add `GROQ_API_KEY` + `GROQ_MODEL` to `.env` and config; pick a tool-calling model
+  - [x] Call the chat API from Python
+  - [x] Get a trivial tool-call working (e.g. a fake `get_time` tool)
 
 ### Phase 3 — Data layer: catalog & database
 *Goal: products stored in a database and searchable.*
