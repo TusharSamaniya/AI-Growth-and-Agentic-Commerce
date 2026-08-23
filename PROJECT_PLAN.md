@@ -383,8 +383,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Verify the rows exist
 - **Task 3.3 — Catalog API**
   - [x] `GET /products` (list all)
-  - [ ] Filter by `max_price` and `category`
-  - [ ] Test the endpoint
+  - [x] Filter by `max_price` and `category`
+  - [x] Test the endpoint
 
 ### Phase 4 — LLM provider layer
 *Goal: a swappable way to talk to the model (Ollama now, hosted later).*

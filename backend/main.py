@@ -15,8 +15,13 @@ def health():
     return {"status": "ok"}
 
 
-# Return the whole product catalog as JSON.
+# Return products, optionally filtered by max_price (in paise) and/or category.
 @app.get("/products")
-def list_products():
+def list_products(max_price: int | None = None, category: str | None = None):
+    query = select(Product)
+    if max_price is not None:
+        query = query.where(Product.price <= max_price)
+    if category is not None:
+        query = query.where(Product.category == category)
     with Session(engine) as session:
-        return session.exec(select(Product)).all()
+        return session.exec(query).all()
