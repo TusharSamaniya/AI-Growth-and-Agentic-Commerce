@@ -10,6 +10,7 @@ import razorpay
 from razorpay.errors import SignatureVerificationError
 from sqlmodel import Session, select
 
+from backend.audit import record
 from backend.config import settings
 from backend.database import engine
 from backend.events import publish
@@ -20,7 +21,8 @@ from backend.tools import require_confirmation
 _client = razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
 
 
-def create_order(cart: dict, contact: dict, confirmed: bool, idempotency_key: str) -> dict:
+def create_order(cart: dict, contact: dict, confirmed: bool, idempotency_key: str,
+                 conversation_id: str | None = None) -> dict:
     """Behind the confirmation gate, create a Razorpay order + payment link and
     persist an Order that records the Razorpay ids.
 
@@ -67,6 +69,7 @@ def create_order(cart: dict, contact: dict, confirmed: bool, idempotency_key: st
         razorpay_order_id=rzp_order["id"],
         payment_link_id=link["id"],
         payment_link_url=link["short_url"],
+        conversation_id=conversation_id,
     )
     order.set_status("awaiting_payment")  # created -> awaiting_payment: a link now exists
 
@@ -74,7 +77,18 @@ def create_order(cart: dict, contact: dict, confirmed: bool, idempotency_key: st
         session.add(order)
         session.commit()
         session.refresh(order)   # reload to get the database-assigned id
-        return order.model_dump()
+        result = order.model_dump()
+
+    # Log the money action + Razorpay response to this conversation's audit trail.
+    if conversation_id:
+        record(conversation_id, "order_created", {
+            "order_id": result["id"],
+            "amount": amount,
+            "razorpay_order_id": rzp_order["id"],
+            "payment_link_id": link["id"],
+            "status": result["status"],
+        })
+    return result
 
 
 def verify_webhook_signature(body: bytes, signature: str) -> bool:
@@ -125,14 +139,25 @@ def get_payment_status(order_id: int) -> dict:
     # Map Razorpay's status onto our order and advance it — but only if that's a
     # legal transition from where the order is now (this makes polling idempotent).
     target = RAZORPAY_TO_ORDER_STATUS.get(razorpay_status)
+    changed = False
     with Session(engine) as session:
         order = session.get(Order, order_id)
+        from_status = order.status
+        conversation_id = order.conversation_id
         if target and target in ORDER_TRANSITIONS[order.status]:
             order.set_status(target)   # still the enforcer of legal edges
             session.add(order)
             session.commit()
             session.refresh(order)
+            changed = True
         our_status = order.status
+
+    # A real transition is a status change worth logging to the audit trail.
+    if changed and conversation_id:
+        record(conversation_id, "status_change", {
+            "order_id": order_id, "from": from_status, "to": our_status,
+            "razorpay_status": razorpay_status, "source": "polling",
+        })
 
     return {
         "order_id": order_id,
@@ -183,9 +208,17 @@ def apply_webhook_event(payload: dict) -> str:
         if target not in ORDER_TRANSITIONS[order.status]:
             return f"{event}: order {order.id} already {order.status}"
         order_id = order.id
+        from_status = order.status
+        conversation_id = order.conversation_id
         order.set_status(target)   # still the enforcer of legal edges
         session.add(order)
         session.commit()
-        if target == "paid":       # nudge every open SSE subscriber, live
-            publish(json.dumps({"type": "payment_received", "order_id": order_id}))
-        return f"{event}: order {order_id} -> {target}"
+
+    if target == "paid":           # nudge every open SSE subscriber, live
+        publish(json.dumps({"type": "payment_received", "order_id": order_id}))
+    if conversation_id:            # log the status change to the audit trail
+        record(conversation_id, "status_change", {
+            "order_id": order_id, "from": from_status, "to": target,
+            "event": event, "source": "webhook",
+        })
+    return f"{event}: order {order_id} -> {target}"

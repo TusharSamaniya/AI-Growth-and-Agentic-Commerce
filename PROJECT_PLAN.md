@@ -452,7 +452,7 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 - **Task 8.1 — `audit_entry` model + hash-chaining**
   - [x] Store `prev_hash` + `hash(entry)` for each entry
 - **Task 8.2 — Log everything**
-  - [ ] Buyer messages, agent decisions + rationale, money actions, Razorpay responses, status changes
+  - [x] Buyer messages, agent decisions + rationale, money actions, Razorpay responses, status changes
 - **Task 8.3 — Audit query & export**
   - [ ] `GET /audit/{conversation_id}`
   - [ ] JSON export

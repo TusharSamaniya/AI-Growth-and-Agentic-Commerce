@@ -56,6 +56,7 @@ class Order(SQLModel, table=True):
     razorpay_order_id: str | None = None           # Razorpay's order id (test mode)
     payment_link_id: str | None = None             # Razorpay's payment link id
     payment_link_url: str | None = None            # the hosted pay page the buyer opens
+    conversation_id: str | None = None             # which conversation's audit chain this order joins
 
     def set_status(self, new_status: str) -> None:
         """Move to new_status, but only if the state machine allows it."""

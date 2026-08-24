@@ -4,6 +4,7 @@
 
 import json
 
+from backend.audit import record
 from backend.llm import get_provider
 from backend.tools import build_cart, recommend, search_catalog, suggest_addons
 
@@ -98,8 +99,12 @@ Rules you must always follow:
 Prices are stored in paise (Rs 1 = 100 paise), so a 10000 rupee budget means 1000000 paise. Always show prices to the buyer in rupees."""
 
 
-def run_agent(messages: list[dict], max_steps: int = 8) -> str:
-    """Let the model call tools until it produces a final answer (bounded by max_steps)."""
+def run_agent(messages: list[dict], max_steps: int = 8, conversation_id: str | None = None) -> str:
+    """Let the model call tools until it produces a final answer (bounded by max_steps).
+
+    If conversation_id is given, each tool the model picks is logged to the audit
+    trail as an "agent_decision" — the record of what the agent chose to do.
+    """
     provider = get_provider()
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
@@ -124,6 +129,8 @@ def run_agent(messages: list[dict], max_steps: int = 8) -> str:
         # Run each tool the model picked and feed the result back.
         for c in reply["tool_calls"]:
             print(f"  [agent] calling {c['name']}({c['arguments']})")
+            if conversation_id:
+                record(conversation_id, "agent_decision", {"tool": c["name"], "arguments": c["arguments"]})
             function = TOOLS.get(c["name"])
             if function is None:
                 result = {"error": f"unknown tool: {c['name']}"}
@@ -150,8 +157,10 @@ _conversations: dict[str, list[dict]] = {}
 
 def chat(conversation_id: str, message: str) -> str:
     """Run one conversational turn, remembering the earlier messages."""
+    record(conversation_id, "buyer_message", {"text": message})
     history = _conversations.setdefault(conversation_id, [])
     history.append({"role": "user", "content": message})
-    reply = run_agent(history)
+    reply = run_agent(history, conversation_id=conversation_id)
     history.append({"role": "assistant", "content": reply})
+    record(conversation_id, "agent_reply", {"text": reply})
     return reply
