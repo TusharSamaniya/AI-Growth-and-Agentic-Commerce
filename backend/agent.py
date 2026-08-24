@@ -64,10 +64,23 @@ TOOL_SCHEMAS = [
     },
 ]
 
+# The agent's standing rules — applied on every turn (persona + the judging-bar rules).
+SYSTEM_PROMPT = """You are CartPilot, a friendly shopping assistant for an online phone store.
+
+Always use the tools to look up real products before you answer — never invent products or prices.
+
+Rules you must always follow:
+1. Stay within budget: never recommend or add an item priced above the buyer's stated budget.
+2. Require confirmation: after building a cart, show it and ask the buyer to confirm before any checkout — never treat a cart as a paid order.
+3. Always explain: give a short reason for every product you recommend.
+
+Prices are stored in paise (Rs 1 = 100 paise), so a 10000 rupee budget means 1000000 paise. Always show prices to the buyer in rupees."""
+
 
 def run_agent(messages: list[dict], max_steps: int = 5) -> str:
     """Let the model call tools until it produces a final answer (bounded by max_steps)."""
     provider = get_provider()
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
     for _ in range(max_steps):
         reply = provider.chat(messages, tools=TOOL_SCHEMAS)
@@ -105,3 +118,19 @@ def run_agent(messages: list[dict], max_steps: int = 5) -> str:
             })
 
     return "Sorry, I couldn't finish that request."
+
+
+# --- Conversation memory -----------------------------------------------------
+# Remember each conversation's messages, keyed by a conversation id, so follow-up
+# turns ("add it to my cart") can see what came before.
+# In-memory on purpose: this resets when the server restarts, which is fine here.
+_conversations: dict[str, list[dict]] = {}
+
+
+def chat(conversation_id: str, message: str) -> str:
+    """Run one conversational turn, remembering the earlier messages."""
+    history = _conversations.setdefault(conversation_id, [])
+    history.append({"role": "user", "content": message})
+    reply = run_agent(history)
+    history.append({"role": "assistant", "content": reply})
+    return reply
