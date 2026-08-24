@@ -23,3 +23,38 @@ class Cart(SQLModel, table=True):
     items: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
     subtotal: int = 0      # sum of line totals, in paise
     total: int = 0         # what the buyer pays, in paise (subtotal + shipping/discounts later)
+
+
+# The order lifecycle as a state machine: each status maps to the statuses it
+# may legally move to next. Illegal jumps (e.g. created -> paid, skipping
+# payment) are refused, so a money action can never skip a step.
+ORDER_TRANSITIONS = {
+    "created": {"awaiting_payment", "cancelled"},
+    "awaiting_payment": {"paid", "failed", "cancelled"},
+    "paid": {"confirmed"},
+    "confirmed": set(),                            # terminal: fulfilled
+    "failed": {"awaiting_payment", "cancelled"},   # retry payment, or give up
+    "cancelled": set(),                            # terminal: called off
+}
+
+
+class InvalidTransitionError(Exception):
+    """Raised when an order is moved along an illegal status edge."""
+
+
+# An order is the checkout of a saved cart — the money record. `status` tracks
+# where it is in the checkout lifecycle, and set_status enforces the transitions
+# allowed by ORDER_TRANSITIONS above.
+class Order(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    cart_id: int = Field(foreign_key="cart.id")   # which cart this order is for
+    amount: int                                    # total charged, in paise
+    status: str = "created"                        # lifecycle state; starts at "created"
+
+    def set_status(self, new_status: str) -> None:
+        """Move to new_status, but only if the state machine allows it."""
+        if new_status not in ORDER_TRANSITIONS[self.status]:
+            raise InvalidTransitionError(
+                f"cannot move order from '{self.status}' to '{new_status}'"
+            )
+        self.status = new_status

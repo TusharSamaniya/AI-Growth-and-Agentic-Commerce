@@ -424,8 +424,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] `Cart` model (items, subtotal, total)
   - [x] Enforce the budget cap
 - **Task 6.2 — Order model & state machine**
-  - [ ] `Order` model with a `status` field
-  - [ ] States: `created → awaiting_payment → paid → confirmed` (+ `failed` / `cancelled`)
+  - [x] `Order` model with a `status` field
+  - [x] States: `created → awaiting_payment → paid → confirmed` (+ `failed` / `cancelled`)
 - **Task 6.3 — The confirmation gate**
   - [ ] Require explicit buyer confirmation (cart + amount + contact) before any order is created
 - **Task 6.4 — `create_order` tool → Razorpay adapter**
