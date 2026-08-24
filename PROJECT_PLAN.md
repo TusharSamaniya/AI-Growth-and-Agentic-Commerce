@@ -454,8 +454,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 - **Task 8.2 — Log everything**
   - [x] Buyer messages, agent decisions + rationale, money actions, Razorpay responses, status changes
 - **Task 8.3 — Audit query & export**
-  - [ ] `GET /audit/{conversation_id}`
-  - [ ] JSON export
+  - [x] `GET /audit/{conversation_id}`
+  - [x] JSON export
 
 ### Phase 9 — Frontend: React chat UI
 *Goal: the buyer-facing experience the judges actually watch.*

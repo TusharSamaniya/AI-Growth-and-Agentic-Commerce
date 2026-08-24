@@ -59,6 +59,17 @@ def record(conversation_id: str, action: str, data: dict) -> dict:
         return entry.model_dump()
 
 
+def get_chain(conversation_id: str) -> list[dict]:
+    """Return every entry in this conversation's chain, oldest first."""
+    with Session(engine) as session:
+        entries = session.exec(
+            select(AuditEntry)
+            .where(AuditEntry.conversation_id == conversation_id)
+            .order_by(AuditEntry.id)
+        ).all()
+    return [entry.model_dump() for entry in entries]
+
+
 def verify_chain(conversation_id: str) -> bool:
     """True if the conversation's chain is intact — nothing altered or reordered.
 
@@ -81,3 +92,14 @@ def verify_chain(conversation_id: str) -> bool:
             return False
         prev_hash = entry.hash
     return True
+
+
+def audit_report(conversation_id: str) -> dict:
+    """The full audit trail for a conversation plus whether its chain is intact —
+    the shared payload the query and export endpoints both return.
+    """
+    return {
+        "conversation_id": conversation_id,
+        "verified": verify_chain(conversation_id),
+        "entries": get_chain(conversation_id),
+    }

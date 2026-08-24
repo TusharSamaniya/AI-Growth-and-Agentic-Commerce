@@ -2,10 +2,11 @@ import asyncio
 import json
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from backend.audit import audit_report
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
 from backend.llm import get_provider
@@ -48,6 +49,27 @@ class ChatRequest(BaseModel):
 def chat(request: ChatRequest):
     messages = [{"role": "user", "content": request.message}]
     return provider.chat(messages)
+
+
+# Return one conversation's audit trail, plus whether its hash chain is intact.
+# This is the judging-bar payload: the full, ordered record of every buyer
+# message, agent decision, money action and status change — with a "verified"
+# flag proving nothing was altered after the fact. The Phase 9 audit panel reads
+# this; a judge can hit it directly to inspect any conversation.
+@app.get("/audit/{conversation_id}")
+def audit(conversation_id: str):
+    return audit_report(conversation_id)
+
+
+# The same audit report, but delivered as a file download
+# (Content-Disposition: attachment) — the standalone JSON artifact a judge can
+# save and re-verify offline. The last entry's hash is the chain's anchor: keep
+# this file and any later tampering with the live ledger won't match it.
+@app.get("/audit/{conversation_id}/export")
+def audit_export(conversation_id: str):
+    report = audit_report(conversation_id)
+    headers = {"Content-Disposition": f'attachment; filename="audit-{conversation_id}.json"'}
+    return JSONResponse(report, headers=headers)
 
 
 # Razorpay calls this the instant a payment event happens (the "push" that
