@@ -2,6 +2,7 @@ import asyncio
 import json
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -15,6 +16,15 @@ from backend.payments import apply_webhook_event, verify_webhook_signature
 
 # Create the FastAPI application. This "app" is what Uvicorn runs.
 app = FastAPI()
+
+# Let the Vite dev frontend (http://localhost:5173) call this API from the
+# browser. Without CORS the browser blocks these cross-origin requests.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Build the LLM provider once at startup (chosen by LLM_PROVIDER) and reuse it.
 provider = get_provider()

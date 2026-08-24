@@ -460,7 +460,7 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 ### Phase 9 — Frontend: React chat UI
 *Goal: the buyer-facing experience the judges actually watch.*
 - **Task 9.1 — Vite + React setup**
-  - [ ] Scaffold the app and connect it to the backend
+  - [x] Scaffold the app and connect it to the backend
 - **Task 9.2 — Chat interface**
   - [ ] Message list + input box
   - [ ] Send to `/chat`, render replies
