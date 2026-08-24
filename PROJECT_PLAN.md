@@ -444,8 +444,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Verify the `X-Razorpay-Signature`
   - [x] Update the order on `payment.captured` / `payment_link.paid` / `payment.failed`
 - **Task 7.3 — Live updates via SSE**
-  - [ ] An SSE endpoint the UI subscribes to
-  - [ ] Push "payment received" when the order is paid
+  - [x] An SSE endpoint the UI subscribes to
+  - [x] Push "payment received" when the order is paid
 
 ### Phase 8 — Audit trail (hash-chained ledger)
 *Goal: prove every step happened, tamper-evident — the heart of the judging bar.*

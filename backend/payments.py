@@ -4,12 +4,15 @@
 # The raw Razorpay calls were de-risked in scripts/create_order.py and
 # scripts/create_payment_link.py.
 
+import json
+
 import razorpay
 from razorpay.errors import SignatureVerificationError
 from sqlmodel import Session, select
 
 from backend.config import settings
 from backend.database import engine
+from backend.events import publish
 from backend.models import ORDER_TRANSITIONS, Order
 from backend.tools import require_confirmation
 
@@ -179,7 +182,10 @@ def apply_webhook_event(payload: dict) -> str:
             return f"no order matched {event}"
         if target not in ORDER_TRANSITIONS[order.status]:
             return f"{event}: order {order.id} already {order.status}"
+        order_id = order.id
         order.set_status(target)   # still the enforcer of legal edges
         session.add(order)
         session.commit()
-        return f"{event}: order {order.id} -> {target}"
+        if target == "paid":       # nudge every open SSE subscriber, live
+            publish(json.dumps({"type": "payment_received", "order_id": order_id}))
+        return f"{event}: order {order_id} -> {target}"

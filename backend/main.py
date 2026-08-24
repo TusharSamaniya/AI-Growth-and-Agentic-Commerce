@@ -1,10 +1,13 @@
+import asyncio
 import json
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from backend.database import engine
+from backend.events import subscribe, unsubscribe
 from backend.llm import get_provider
 from backend.models import Product
 from backend.payments import apply_webhook_event, verify_webhook_signature
@@ -63,3 +66,28 @@ async def webhook(request: Request):
     result = apply_webhook_event(payload)
     print("[webhook]", result)
     return {"status": "ok"}
+
+
+# Server-Sent Events: a one-way stream the UI subscribes to (browser side:
+# new EventSource("/events")). Each connection subscribes to the pub/sub bus and
+# forwards every published event as "data: ...\n\n". When an order is paid, the
+# webhook publishes a "payment_received" event and it lands here instantly — no
+# polling. If there's no news for 15s we send a keepalive comment to hold the
+# connection open, and we unsubscribe when the client disconnects.
+@app.get("/events")
+async def events():
+    queue = subscribe()
+
+    async def stream():
+        yield 'data: {"type": "connected"}\n\n'    # confirms the subscription is live
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield f"data: {event}\n\n"      # a real published event
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"         # a comment line holds the connection open
+        finally:
+            unsubscribe(queue)                     # clean up when the client goes away
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
