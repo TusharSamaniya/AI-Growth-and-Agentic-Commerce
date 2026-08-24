@@ -432,7 +432,7 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Run the governance check, then create the Razorpay order + payment link
   - [x] Store the Razorpay IDs on the order
 - **Task 6.5 — Idempotency**
-  - [ ] Add an idempotency key to prevent accidental double orders
+  - [x] Add an idempotency key to prevent accidental double orders
 
 ### Phase 7 — Payment status & realtime updates
 *Goal: know the moment payment happens, and tell the UI instantly.*

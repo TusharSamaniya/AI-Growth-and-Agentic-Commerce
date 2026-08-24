@@ -49,6 +49,9 @@ class Order(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     cart_id: int = Field(foreign_key="cart.id")   # which cart this order is for
     amount: int                                    # total charged, in paise
+    # Unique per checkout attempt: a retry with the same key returns the same
+    # order instead of creating a duplicate (prevents accidental double orders).
+    idempotency_key: str | None = Field(default=None, unique=True, index=True)
     status: str = "created"                        # lifecycle state; starts at "created"
     razorpay_order_id: str | None = None           # Razorpay's order id (test mode)
     payment_link_id: str | None = None             # Razorpay's payment link id

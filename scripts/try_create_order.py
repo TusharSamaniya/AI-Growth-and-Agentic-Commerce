@@ -5,6 +5,7 @@
 # Run from the project root:  python -m scripts.try_create_order
 
 import sys
+import uuid
 
 from backend.payments import create_order
 from backend.tools import ConfirmationError, build_cart, save_cart
@@ -16,12 +17,12 @@ contact = {"email": "buyer@example.com"}
 
 # 1) No confirmation -> the gate blocks BEFORE any Razorpay call is made.
 try:
-    create_order(cart, contact, confirmed=False)
+    create_order(cart, contact, confirmed=False, idempotency_key=f"demo-{uuid.uuid4()}")
 except ConfirmationError as e:
     print("Gate blocked (no Razorpay call made):", e)
 
 # 2) Confirmed -> gate passes; Razorpay artifacts created and stored on the Order.
-order = create_order(cart, contact, confirmed=True)
+order = create_order(cart, contact, confirmed=True, idempotency_key=f"demo-{uuid.uuid4()}")
 print("\nOrder saved behind the gate:")
 print("  order id         :", order["id"])
 print("  status           :", order["status"])
