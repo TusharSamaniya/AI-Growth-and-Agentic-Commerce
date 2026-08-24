@@ -64,3 +64,18 @@ class Order(SQLModel, table=True):
                 f"cannot move order from '{self.status}' to '{new_status}'"
             )
         self.status = new_status
+
+
+# One entry in the tamper-evident audit ledger. Entries form a hash chain per
+# conversation: each stores the previous entry's hash (prev_hash) and its own
+# hash over (this entry's content + prev_hash). Altering any past entry breaks
+# its hash — and every hash after it — so the trail can't be silently rewritten.
+# This is the core of the judging bar: "show the audit trail".
+class AuditEntry(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    conversation_id: str = Field(index=True)   # groups entries into one chain
+    action: str                                # what happened, e.g. "order_created"
+    # The details of the event, stored as one JSON column.
+    data: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    prev_hash: str                             # hash of the previous entry ("" = genesis)
+    hash: str                                  # sha256 over this entry's content + prev_hash

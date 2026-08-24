@@ -2,7 +2,7 @@
 # Run from the project root:  python -m scripts.init_db
 
 from backend.database import create_db_and_tables
-from backend.models import Cart, Order, Product  # importing registers the tables so they get created
+from backend.models import AuditEntry, Cart, Order, Product  # importing registers the tables so they get created
 
 create_db_and_tables()
 print("Database ready: cartpilot.db")
