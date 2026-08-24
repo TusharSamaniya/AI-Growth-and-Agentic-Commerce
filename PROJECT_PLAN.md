@@ -437,8 +437,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 ### Phase 7 — Payment status & realtime updates
 *Goal: know the moment payment happens, and tell the UI instantly.*
 - **Task 7.1 — `get_payment_status` tool + polling**
-  - [ ] Poll Razorpay for the order/link status
-  - [ ] Map it to the order state machine
+  - [x] Poll Razorpay for the order/link status
+  - [x] Map it to the order state machine
 - **Task 7.2 — Webhook receiver (optional; polling is the fallback)**
   - [ ] `POST /webhook` endpoint
   - [ ] Verify the `X-Razorpay-Signature`

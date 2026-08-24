@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 
 from backend.config import settings
 from backend.database import engine
-from backend.models import Order
+from backend.models import ORDER_TRANSITIONS, Order
 from backend.tools import require_confirmation
 
 # One client for the app, authed with our TEST-MODE keys from .env.
@@ -71,3 +71,50 @@ def create_order(cart: dict, contact: dict, confirmed: bool, idempotency_key: st
         session.commit()
         session.refresh(order)   # reload to get the database-assigned id
         return order.model_dump()
+
+
+# How Razorpay's payment-link status maps onto our order state machine. Statuses
+# not listed (created, partially_paid) mean "no change yet" — still awaiting.
+RAZORPAY_TO_ORDER_STATUS = {
+    "paid": "paid",
+    "expired": "failed",
+    "cancelled": "cancelled",
+}
+
+
+def get_payment_status(order_id: int) -> dict:
+    """Poll Razorpay for the payment link's status and sync our order to match.
+
+    The buyer pays via the payment link, so its status is the source of truth.
+    We map that status onto our state machine and advance the order — but only
+    along a LEGAL edge, so re-polling a paid order (paid -> paid, not allowed)
+    or a terminal one simply does nothing instead of erroring.
+    """
+    with Session(engine) as session:
+        order = session.get(Order, order_id)
+        if order is None:
+            return {"error": f"order {order_id} not found"}
+        payment_link_id = order.payment_link_id
+
+    # Network call kept outside the DB session on purpose.
+    link = _client.payment_link.fetch(payment_link_id)
+    razorpay_status = link["status"]
+
+    # Map Razorpay's status onto our order and advance it — but only if that's a
+    # legal transition from where the order is now (this makes polling idempotent).
+    target = RAZORPAY_TO_ORDER_STATUS.get(razorpay_status)
+    with Session(engine) as session:
+        order = session.get(Order, order_id)
+        if target and target in ORDER_TRANSITIONS[order.status]:
+            order.set_status(target)   # still the enforcer of legal edges
+            session.add(order)
+            session.commit()
+            session.refresh(order)
+        our_status = order.status
+
+    return {
+        "order_id": order_id,
+        "order_status": our_status,          # our state machine status (now synced)
+        "razorpay_status": razorpay_status,  # created / paid / expired / cancelled
+        "amount_paid": link["amount_paid"],  # paise actually paid so far
+    }
