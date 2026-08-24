@@ -415,8 +415,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Suggest 2–3 options with short pros/cons
   - [x] Ask 1–2 clarifying questions (camera vs battery, brand)
 - **Task 5.5 — Bounded upsell**
-  - [ ] Propose add-ons that keep the total within budget
-  - [ ] Never breach the budget cap silently
+  - [x] Propose add-ons that keep the total within budget
+  - [x] Never breach the budget cap silently
 
 ### Phase 6 — Cart, orders & governance
 *Goal: turn a confirmed cart into a Razorpay order — safely and on purpose.*

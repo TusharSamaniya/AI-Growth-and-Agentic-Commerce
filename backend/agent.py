@@ -5,13 +5,14 @@
 import json
 
 from backend.llm import get_provider
-from backend.tools import build_cart, recommend, search_catalog
+from backend.tools import build_cart, recommend, search_catalog, suggest_addons
 
 # Map each tool name to the real Python function that runs it.
 TOOLS = {
     "search_catalog": search_catalog,
     "recommend": recommend,
     "build_cart": build_cart,
+    "suggest_addons": suggest_addons,
 }
 
 # Describe the tools to the model so it knows what it can call and with what args.
@@ -26,7 +27,7 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "query": {"type": "string", "description": "Words to match in name/specs/brand"},
                     "max_price": {"type": "integer", "description": "Highest price, in paise"},
-                    "filters": {"type": "object", "description": 'Exact filters, e.g. {"category": "phone"}'},
+                    "filters": {"type": "object", "description": 'Exact filters. Valid categories: "phone", "case", "screen_guard". Example: {"category": "phone"}'},
                 },
             },
         },
@@ -51,14 +52,30 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "build_cart",
-            "description": "Build a cart from product ids (repeat an id for quantity > 1). Total is in paise.",
+            "description": "Build a cart from product ids (repeat an id for quantity > 1). Total is in paise. Pass budget (paise) to flag an over-budget total.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "product_ids": {"type": "array", "items": {"type": "integer"},
                                     "description": "The chosen product ids"},
+                    "budget": {"type": "integer", "description": "The buyer's budget in paise, if known"},
                 },
                 "required": ["product_ids"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "suggest_addons",
+            "description": "Suggest in-stock accessories that fit the remaining budget. total and budget are in paise.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "total": {"type": "integer", "description": "Current cart total, in paise"},
+                    "budget": {"type": "integer", "description": "The buyer's budget, in paise"},
+                },
+                "required": ["total", "budget"],
             },
         },
     },
@@ -75,11 +92,13 @@ Rules you must always follow:
 3. Always explain: give a short reason for every product you recommend.
 4. Offer choices: when the buyer is still deciding, present 2-3 options with one short pro and one short con each (based on their real specs and price), then ask which they prefer. Skip this only if they already named a specific product.
 5. Ask before guessing: if key details are missing (budget, whether they prefer things like camera vs battery, or a brand), ask 1-2 short clarifying questions first, then recommend. Never ask more than two, and don't re-ask what they already told you.
+6. Bounded upsell: once the buyer has picked a phone and you know their budget, call suggest_addons(total, budget) and offer only the accessories it returns — they already fit the remaining budget. Never suggest an add-on that would push the total over budget; if nothing fits, don't push accessories.
+7. Never hide a breach: whenever you build a cart and know the budget, pass it to build_cart. If the result comes back over_budget, tell the buyer plainly that the cart is over budget and by how much (over_by), and ask how they want to proceed — never present an over-budget cart as if it were fine.
 
 Prices are stored in paise (Rs 1 = 100 paise), so a 10000 rupee budget means 1000000 paise. Always show prices to the buyer in rupees."""
 
 
-def run_agent(messages: list[dict], max_steps: int = 5) -> str:
+def run_agent(messages: list[dict], max_steps: int = 8) -> str:
     """Let the model call tools until it produces a final answer (bounded by max_steps)."""
     provider = get_provider()
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages

@@ -66,10 +66,12 @@ def recommend(products: list[dict], preferences: str = "", limit: int = 3) -> li
     return picks
 
 
-def build_cart(product_ids: list[int]) -> dict:
+def build_cart(product_ids: list[int], budget: int | None = None) -> dict:
     """Assemble a cart from product IDs (repeat an ID for quantity > 1).
 
     Returns line items, a total in paise, and any unavailable IDs with a reason.
+    If a budget (paise) is given, also flags whether the total is over it and by
+    how much — so an over-budget cart can never pass by silently.
     """
     quantities = Counter(product_ids)  # {product_id: how many requested}
     items = []
@@ -94,4 +96,27 @@ def build_cart(product_ids: list[int]) -> dict:
                     "line_total": line_total,
                 })
 
-    return {"items": items, "total": total, "unavailable": unavailable}
+    result = {"items": items, "total": total, "unavailable": unavailable}
+    if budget is not None:
+        result["over_budget"] = total > budget
+        result["over_by"] = max(0, total - budget)  # paise over the cap (0 if within)
+    return result
+
+
+def suggest_addons(total: int, budget: int) -> list[dict]:
+    """Suggest in-stock accessories that fit the remaining budget.
+
+    total and budget are in paise. Returns only add-ons priced within
+    (budget - total), each with the resulting new total — so accepting any of
+    them is guaranteed to keep the cart within budget.
+    """
+    remaining = budget - total
+    statement = select(Product).where(Product.category != "phone", Product.stock > 0)
+    with Session(engine) as session:
+        accessories = session.exec(statement).all()
+
+    return [
+        {"id": a.id, "name": a.name, "price": a.price, "new_total": total + a.price}
+        for a in accessories
+        if a.price <= remaining
+    ]
