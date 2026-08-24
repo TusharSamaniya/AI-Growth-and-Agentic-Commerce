@@ -402,9 +402,9 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 ### Phase 5 — The agent & tools (conversational core)
 *Goal: the agent recommends, asks smart questions, and upsells — up to a chosen cart.*
 - **Task 5.1 — Define the agent tools**
-  - [ ] `search_catalog(query, max_price, filters)`
-  - [ ] `recommend(products, preferences)`
-  - [ ] `build_cart(product_ids)`
+  - [x] `search_catalog(query, max_price, filters)`
+  - [x] `recommend(products, preferences)`
+  - [x] `build_cart(product_ids)`
 - **Task 5.2 — The agent loop (tool-calling orchestration)**
   - [ ] Send tools to the model, run the tool it picks, feed the result back
   - [ ] Loop until the agent returns a final message
