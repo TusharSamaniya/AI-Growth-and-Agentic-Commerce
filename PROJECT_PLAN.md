@@ -429,8 +429,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 - **Task 6.3 — The confirmation gate**
   - [x] Require explicit buyer confirmation (cart + amount + contact) before any order is created
 - **Task 6.4 — `create_order` tool → Razorpay adapter**
-  - [ ] Run the governance check, then create the Razorpay order + payment link
-  - [ ] Store the Razorpay IDs on the order
+  - [x] Run the governance check, then create the Razorpay order + payment link
+  - [x] Store the Razorpay IDs on the order
 - **Task 6.5 — Idempotency**
   - [ ] Add an idempotency key to prevent accidental double orders
 

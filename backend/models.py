@@ -50,6 +50,9 @@ class Order(SQLModel, table=True):
     cart_id: int = Field(foreign_key="cart.id")   # which cart this order is for
     amount: int                                    # total charged, in paise
     status: str = "created"                        # lifecycle state; starts at "created"
+    razorpay_order_id: str | None = None           # Razorpay's order id (test mode)
+    payment_link_id: str | None = None             # Razorpay's payment link id
+    payment_link_url: str | None = None            # the hosted pay page the buyer opens
 
     def set_status(self, new_status: str) -> None:
         """Move to new_status, but only if the state machine allows it."""
