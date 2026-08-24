@@ -406,8 +406,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] `recommend(products, preferences)`
   - [x] `build_cart(product_ids)`
 - **Task 5.2 — The agent loop (tool-calling orchestration)**
-  - [ ] Send tools to the model, run the tool it picks, feed the result back
-  - [ ] Loop until the agent returns a final message
+  - [x] Send tools to the model, run the tool it picks, feed the result back
+  - [x] Loop until the agent returns a final message
 - **Task 5.3 — System prompt & conversation memory**
   - [ ] Write the system prompt (rules: stay within budget, require confirmation, always give a rationale)
   - [ ] Keep per-conversation message history
