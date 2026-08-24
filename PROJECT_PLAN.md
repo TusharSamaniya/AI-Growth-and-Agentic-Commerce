@@ -412,8 +412,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Write the system prompt (rules: stay within budget, require confirmation, always give a rationale)
   - [x] Keep per-conversation message history
 - **Task 5.4 — Smart recommendations + clarifying questions**
-  - [ ] Suggest 2–3 options with short pros/cons
-  - [ ] Ask 1–2 clarifying questions (camera vs battery, brand)
+  - [x] Suggest 2–3 options with short pros/cons
+  - [x] Ask 1–2 clarifying questions (camera vs battery, brand)
 - **Task 5.5 — Bounded upsell**
   - [ ] Propose add-ons that keep the total within budget
   - [ ] Never breach the budget cap silently
