@@ -137,3 +137,49 @@ def get_payment_status(order_id: int) -> dict:
         "razorpay_status": razorpay_status,  # created / paid / expired / cancelled
         "amount_paid": link["amount_paid"],  # paise actually paid so far
     }
+
+
+# Which order status each webhook event drives us toward. Events not listed
+# (e.g. payment.authorized) are ignored.
+WEBHOOK_EVENT_TO_STATUS = {
+    "payment_link.paid": "paid",
+    "payment.captured": "paid",
+    "payment.failed": "failed",
+}
+
+
+def apply_webhook_event(payload: dict) -> str:
+    """Advance the matching order based on a VERIFIED webhook event.
+
+    Finds our Order from the Razorpay ids the event carries — the payment link
+    id for link events, the payment's order id for payment events — and moves it
+    along the state machine (paid / failed). Only LEGAL transitions are applied,
+    so a duplicate delivery (Razorpay retries until it gets a 2xx) is a harmless
+    no-op. Unhandled events and unmatched orders are ignored. Returns a short
+    summary string for the endpoint to log.
+    """
+    event = payload.get("event")
+    target = WEBHOOK_EVENT_TO_STATUS.get(event)
+    if target is None:
+        return f"ignored {event}"
+
+    # Different event families carry different ids; match our order on the right one.
+    entities = payload.get("payload", {})
+    if event == "payment_link.paid":
+        match = Order.payment_link_id == entities["payment_link"]["entity"]["id"]
+    else:  # payment.captured / payment.failed carry the paid order's id
+        rzp_order_id = entities["payment"]["entity"].get("order_id")
+        if rzp_order_id is None:
+            return f"{event}: no order id in payload"
+        match = Order.razorpay_order_id == rzp_order_id
+
+    with Session(engine) as session:
+        order = session.exec(select(Order).where(match)).first()
+        if order is None:
+            return f"no order matched {event}"
+        if target not in ORDER_TRANSITIONS[order.status]:
+            return f"{event}: order {order.id} already {order.status}"
+        order.set_status(target)   # still the enforcer of legal edges
+        session.add(order)
+        session.commit()
+        return f"{event}: order {order.id} -> {target}"
