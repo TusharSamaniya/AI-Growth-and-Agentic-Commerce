@@ -7,7 +7,7 @@ from collections import Counter
 from sqlmodel import Session, or_, select
 
 from backend.database import engine
-from backend.models import Product
+from backend.models import Cart, Product
 
 
 def search_catalog(
@@ -120,3 +120,33 @@ def suggest_addons(total: int, budget: int) -> list[dict]:
         for a in accessories
         if a.price <= remaining
     ]
+
+
+# Raised when a cart's total would exceed the budget cap. A named exception so
+# callers (e.g. order creation) can catch a budget breach specifically.
+class BudgetExceededError(Exception):
+    pass
+
+
+def save_cart(items: list[dict], budget: int | None = None) -> dict:
+    """Persist a cart to the database, enforcing the budget cap.
+
+    `items` is the line-item list from build_cart. subtotal and total are in
+    paise. If a budget is given and the total exceeds it, the cart is REFUSED
+    (raises BudgetExceededError) — here the cap is enforced, not just flagged as
+    build_cart does. Returns the saved cart as a dict.
+    """
+    subtotal = sum(item["line_total"] for item in items)
+    total = subtotal  # shipping/discounts would adjust total later
+
+    if budget is not None and total > budget:
+        raise BudgetExceededError(
+            f"cart total {total} paise exceeds budget {budget} paise by {total - budget}"
+        )
+
+    cart = Cart(items=items, subtotal=subtotal, total=total)
+    with Session(engine) as session:
+        session.add(cart)
+        session.commit()
+        session.refresh(cart)   # reload to get the database-assigned id
+        return cart.model_dump()

@@ -421,8 +421,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 ### Phase 6 — Cart, orders & governance
 *Goal: turn a confirmed cart into a Razorpay order — safely and on purpose.*
 - **Task 6.1 — Cart model & budget bounding**
-  - [ ] `Cart` model (items, subtotal, total)
-  - [ ] Enforce the budget cap
+  - [x] `Cart` model (items, subtotal, total)
+  - [x] Enforce the budget cap
 - **Task 6.2 — Order model & state machine**
   - [ ] `Order` model with a `status` field
   - [ ] States: `created → awaiting_payment → paid → confirmed` (+ `failed` / `cancelled`)
