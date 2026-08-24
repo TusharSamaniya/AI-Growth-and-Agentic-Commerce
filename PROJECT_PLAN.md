@@ -427,7 +427,7 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] `Order` model with a `status` field
   - [x] States: `created → awaiting_payment → paid → confirmed` (+ `failed` / `cancelled`)
 - **Task 6.3 — The confirmation gate**
-  - [ ] Require explicit buyer confirmation (cart + amount + contact) before any order is created
+  - [x] Require explicit buyer confirmation (cart + amount + contact) before any order is created
 - **Task 6.4 — `create_order` tool → Razorpay adapter**
   - [ ] Run the governance check, then create the Razorpay order + payment link
   - [ ] Store the Razorpay IDs on the order

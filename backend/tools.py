@@ -150,3 +150,31 @@ def save_cart(items: list[dict], budget: int | None = None) -> dict:
         session.commit()
         session.refresh(cart)   # reload to get the database-assigned id
         return cart.model_dump()
+
+
+# Raised when an order is attempted without a valid, explicit confirmation.
+class ConfirmationError(Exception):
+    pass
+
+
+def require_confirmation(cart: dict, amount: int, contact: dict, confirmed: bool) -> None:
+    """The gate before any order is created.
+
+    Refuses (raises ConfirmationError) unless the buyer has EXPLICITLY confirmed
+    this exact cart, amount, and contact:
+      - confirmed must be True (an explicit yes — never assumed by the agent)
+      - the cart must have items
+      - amount must equal the cart's total (the figure shown == the figure charged)
+      - contact must include an email (where the payment link is sent)
+    Returns None if the gate passes, so the caller may proceed to create the order.
+    """
+    if not confirmed:
+        raise ConfirmationError("buyer has not explicitly confirmed the order")
+    if not cart.get("items"):
+        raise ConfirmationError("cart is empty")
+    if amount != cart["total"]:
+        raise ConfirmationError(
+            f"confirmed amount {amount} does not match cart total {cart['total']}"
+        )
+    if "@" not in contact.get("email", ""):
+        raise ConfirmationError("a valid contact email is required")
