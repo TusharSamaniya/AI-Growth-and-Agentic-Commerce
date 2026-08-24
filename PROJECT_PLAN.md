@@ -440,8 +440,8 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Poll Razorpay for the order/link status
   - [x] Map it to the order state machine
 - **Task 7.2 — Webhook receiver (optional; polling is the fallback)**
-  - [ ] `POST /webhook` endpoint
-  - [ ] Verify the `X-Razorpay-Signature`
+  - [x] `POST /webhook` endpoint
+  - [x] Verify the `X-Razorpay-Signature`
   - [ ] Update the order on `payment.captured` / `payment_link.paid` / `payment.failed`
 - **Task 7.3 — Live updates via SSE**
   - [ ] An SSE endpoint the UI subscribes to

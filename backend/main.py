@@ -1,10 +1,13 @@
-from fastapi import FastAPI
+import json
+
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from backend.database import engine
 from backend.llm import get_provider
 from backend.models import Product
+from backend.payments import verify_webhook_signature
 
 # Create the FastAPI application. This "app" is what Uvicorn runs.
 app = FastAPI()
@@ -42,3 +45,20 @@ class ChatRequest(BaseModel):
 def chat(request: ChatRequest):
     messages = [{"role": "user", "content": request.message}]
     return provider.chat(messages)
+
+
+# Razorpay calls this the instant a payment event happens (the "push" that
+# complements our polling). We first verify the X-Razorpay-Signature so a forger
+# can't POST a fake "paid" event; only then do we trust the body. Acting on the
+# event (moving the order) comes next. We take the raw Request because the
+# signature check must hash the exact bytes Razorpay sent.
+@app.post("/webhook")
+async def webhook(request: Request):
+    body = await request.body()
+    signature = request.headers.get("X-Razorpay-Signature", "")
+    if not verify_webhook_signature(body, signature):
+        raise HTTPException(status_code=400, detail="invalid signature")
+
+    payload = json.loads(body)
+    print("[webhook] verified event:", payload.get("event"))
+    return {"status": "ok"}

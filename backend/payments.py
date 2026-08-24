@@ -5,6 +5,7 @@
 # scripts/create_payment_link.py.
 
 import razorpay
+from razorpay.errors import SignatureVerificationError
 from sqlmodel import Session, select
 
 from backend.config import settings
@@ -71,6 +72,24 @@ def create_order(cart: dict, contact: dict, confirmed: bool, idempotency_key: st
         session.commit()
         session.refresh(order)   # reload to get the database-assigned id
         return order.model_dump()
+
+
+def verify_webhook_signature(body: bytes, signature: str) -> bool:
+    """True if `signature` is Razorpay's real signature for these exact bytes.
+
+    Razorpay signs each webhook with HMAC-SHA256 over the raw body using our
+    shared webhook secret. We recompute it and compare: a match proves the call
+    is genuinely from Razorpay AND the body wasn't tampered with. A forger
+    without the secret can't produce a valid signature. Returns False instead of
+    raising so the endpoint can simply reject with 400.
+    """
+    try:
+        _client.utility.verify_webhook_signature(
+            body.decode(), signature, settings.razorpay_webhook_secret
+        )
+        return True
+    except SignatureVerificationError:
+        return False
 
 
 # How Razorpay's payment-link status maps onto our order state machine. Statuses

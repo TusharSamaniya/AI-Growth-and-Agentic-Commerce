@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     groq_api_key: str
     groq_model: str
     llm_provider: str = "groq"  # which backend get_provider() picks: "groq" or "hosted"
+    razorpay_webhook_secret: str = ""  # shared secret Razorpay signs webhooks with (set in dashboard)
 
 
 # One shared settings object that the rest of the app imports.
