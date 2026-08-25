@@ -12,7 +12,8 @@ from backend.audit import audit_report
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
 from backend.models import Product
-from backend.payments import apply_webhook_event, verify_webhook_signature
+from backend.payments import apply_webhook_event, create_order, verify_webhook_signature
+from backend.tools import ConfirmationError, save_cart
 
 # Create the FastAPI application. This "app" is what Uvicorn runs.
 app = FastAPI()
@@ -63,6 +64,45 @@ def chat(request: ChatRequest):
         "reply": reply,
         "products": last_products(request.conversation_id),
         "cart": last_cart(request.conversation_id),
+    }
+
+
+# The shape POST /checkout expects: which conversation to check out, and the
+# email where Razorpay sends the payment link.
+class CheckoutRequest(BaseModel):
+    conversation_id: str
+    email: str
+
+
+# The buyer's explicit "Confirm & Pay". This is the ONLY path that creates a
+# money artifact, and it lives here as a plain endpoint — never as an LLM tool —
+# so the model can't self-confirm and bypass the gate. `confirmed=True` here means
+# "a human clicked Pay". We take the cart the agent last built for this
+# conversation, persist it, and hand it to create_order, which runs the
+# confirmation gate before creating the Razorpay order + payment link. The
+# conversation_id doubles as the idempotency key, so a double-click returns the
+# same order instead of charging twice.
+@app.post("/checkout")
+def checkout(request: CheckoutRequest):
+    cart = last_cart(request.conversation_id)
+    if not cart.get("items"):
+        raise HTTPException(status_code=400, detail="no cart to check out")
+    saved = save_cart(cart["items"])
+    try:
+        order = create_order(
+            saved,
+            {"email": request.email},
+            confirmed=True,
+            idempotency_key=request.conversation_id,
+            conversation_id=request.conversation_id,
+        )
+    except ConfirmationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "order_id": order["id"],
+        "amount": order["amount"],
+        "status": order["status"],
+        "payment_link_url": order["payment_link_url"],
     }
 
 

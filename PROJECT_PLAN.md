@@ -468,7 +468,7 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Render recommended products as cards
   - [x] Show the current cart + total
 - **Task 9.4 — Payment step**
-  - [ ] Show the Razorpay payment link / button
+  - [x] Show the Razorpay payment link / button
   - [ ] A "waiting for payment…" state
 - **Task 9.5 — Live confirmation via SSE**
   - [ ] Subscribe to SSE; show "Payment received ✅ — order confirmed"

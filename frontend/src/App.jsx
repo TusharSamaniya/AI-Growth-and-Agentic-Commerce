@@ -12,6 +12,10 @@ export default function App() {
   const [cart, setCart] = useState(null);            // the current cart (from build_cart)
   const [cid] = useState(() => crypto.randomUUID()); // one conversation (+ audit trail) per page load
   const [busy, setBusy] = useState(false);           // true while waiting for the agent's reply
+  const [email, setEmail] = useState("test@example.com"); // where Razorpay sends the payment link
+  const [order, setOrder] = useState(null);          // the checkout result (Razorpay payment link)
+  const [paying, setPaying] = useState(false);       // true while /checkout is in flight
+  const [checkoutError, setCheckoutError] = useState(""); // a calm message if checkout fails
 
   // Add the user's message, send it to the agent, then add the reply.
   async function send() {
@@ -30,11 +34,35 @@ export default function App() {
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
       if (data.products && data.products.length) setProducts(data.products); // keep old cards if none this turn
-      if (data.cart && data.cart.items && data.cart.items.length) setCart(data.cart); // keep old cart if none this turn
+      if (data.cart && data.cart.items && data.cart.items.length) {
+        setCart(data.cart);
+        setOrder(null); // a new cart makes any earlier payment link stale
+      }
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", text: "⚠️ Couldn't reach the agent. Please try again." }]);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // The buyer's explicit "Confirm & Pay": turn the current cart into a Razorpay
+  // payment link. This is the only action that moves money.
+  async function checkout() {
+    if (paying) return;
+    setPaying(true);
+    setCheckoutError("");
+    try {
+      const res = await fetch(`${API}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation_id: cid, email }),
+      });
+      if (!res.ok) throw new Error("bad status");
+      setOrder(await res.json());
+    } catch {
+      setCheckoutError("⚠️ Couldn't start checkout. Please try again.");
+    } finally {
+      setPaying(false);
     }
   }
 
@@ -100,6 +128,42 @@ export default function App() {
           {cart.over_budget && (
             <div style={{ color: "#c00", fontSize: 13, marginTop: 4 }}>
               ⚠️ {rupees(cart.over_by)} over budget
+            </div>
+          )}
+
+          {/* Checkout — only within budget: an over-budget cart can't be paid (bounded). */}
+          {!cart.over_budget && !order && (
+            <div style={{ marginTop: 12 }}>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email for the receipt"
+                style={{ width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }}
+              />
+              <button
+                onClick={checkout}
+                disabled={paying}
+                style={{ width: "100%", padding: 10, background: "#2b8a3e", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
+              >
+                {paying ? "Starting checkout…" : `Confirm & Pay ${rupees(cart.total)}`}
+              </button>
+              {checkoutError && <div style={{ color: "#c00", fontSize: 13, marginTop: 6 }}>{checkoutError}</div>}
+            </div>
+          )}
+
+          {/* Once the order exists, show the Razorpay payment link. */}
+          {order && (
+            <div style={{ marginTop: 12, textAlign: "center" }}>
+              <a
+                href={order.payment_link_url}
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: "block", padding: 10, background: "#2b8a3e", color: "#fff", borderRadius: 8, textDecoration: "none", fontWeight: "bold" }}
+              >
+                Pay {rupees(order.amount)} with Razorpay →
+              </a>
+              <div style={{ color: "#888", fontSize: 12, marginTop: 6 }}>Order #{order.order_id} · {order.status}</div>
             </div>
           )}
         </div>
