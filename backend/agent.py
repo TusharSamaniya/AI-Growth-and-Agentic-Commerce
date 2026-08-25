@@ -142,6 +142,9 @@ def run_agent(messages: list[dict], max_steps: int = 8, conversation_id: str | N
             # Remember any products the agent surfaced, so the UI can show cards.
             if conversation_id and c["name"] in ("search_catalog", "recommend") and isinstance(result, list):
                 _last_products[conversation_id] = result
+            # Remember the latest cart the agent built, so the UI can show a summary.
+            if conversation_id and c["name"] == "build_cart" and isinstance(result, dict) and "items" in result:
+                _last_cart[conversation_id] = result
             messages.append({
                 "role": "tool",
                 "tool_call_id": c["id"],
@@ -161,11 +164,15 @@ _conversations: dict[str, list[dict]] = {}
 # frontend can render them as cards. Reset at the start of every turn.
 _last_products: dict[str, list[dict]] = {}
 
+# The cart the agent built on the latest turn, so the frontend can show a summary.
+_last_cart: dict[str, dict] = {}
+
 
 def chat(conversation_id: str, message: str) -> str:
     """Run one conversational turn, remembering the earlier messages."""
     record(conversation_id, "buyer_message", {"text": message})
     _last_products[conversation_id] = []          # cards reflect THIS turn only
+    _last_cart[conversation_id] = {}              # cart summary reflects THIS turn only
     history = _conversations.setdefault(conversation_id, [])
     history.append({"role": "user", "content": message})
     reply = run_agent(history, conversation_id=conversation_id)
@@ -177,3 +184,8 @@ def chat(conversation_id: str, message: str) -> str:
 def last_products(conversation_id: str) -> list[dict]:
     """The products the agent surfaced on the latest turn (for the UI cards)."""
     return _last_products.get(conversation_id, [])
+
+
+def last_cart(conversation_id: str) -> dict:
+    """The cart the agent built on the latest turn (for the UI cart summary)."""
+    return _last_cart.get(conversation_id, {})

@@ -2,10 +2,14 @@ import { useState } from "react";
 
 const API = "http://127.0.0.1:8000";
 
+// Format a paise integer as rupees, e.g. 899900 -> "₹8,999".
+const rupees = (paise) => `₹${(paise / 100).toLocaleString("en-IN")}`;
+
 export default function App() {
   const [messages, setMessages] = useState([]); // each: { role: "user" | "assistant", text }
   const [input, setInput] = useState("");
   const [products, setProducts] = useState([]);      // the agent's latest recommendations
+  const [cart, setCart] = useState(null);            // the current cart (from build_cart)
   const [cid] = useState(() => crypto.randomUUID()); // one conversation (+ audit trail) per page load
   const [busy, setBusy] = useState(false);           // true while waiting for the agent's reply
 
@@ -26,6 +30,7 @@ export default function App() {
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
       if (data.products && data.products.length) setProducts(data.products); // keep old cards if none this turn
+      if (data.cart && data.cart.items && data.cart.items.length) setCart(data.cart); // keep old cart if none this turn
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", text: "⚠️ Couldn't reach the agent. Please try again." }]);
     } finally {
@@ -69,11 +74,34 @@ export default function App() {
               <div key={p.id} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, width: 170 }}>
                 <strong>{p.name}</strong>
                 <div style={{ color: "#555", fontSize: 13, margin: "4px 0" }}>{p.specs}</div>
-                <div style={{ fontWeight: "bold" }}>₹{(p.price / 100).toLocaleString("en-IN")}</div>
+                <div style={{ fontWeight: "bold" }}>{rupees(p.price)}</div>
                 {p.reason && <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>{p.reason}</div>}
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Cart summary */}
+      {cart && cart.items && cart.items.length > 0 && (
+        <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          <h3 style={{ margin: "0 0 8px" }}>Your cart</h3>
+          {cart.items.map((item) => (
+            <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
+              <span>{item.name} × {item.quantity}</span>
+              <span>{rupees(item.line_total)}</span>
+            </div>
+          ))}
+          <hr style={{ border: "none", borderTop: "1px solid #eee", margin: "8px 0" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
+            <span>Total</span>
+            <span>{rupees(cart.total)}</span>
+          </div>
+          {cart.over_budget && (
+            <div style={{ color: "#c00", fontSize: 13, marginTop: 4 }}>
+              ⚠️ {rupees(cart.over_by)} over budget
+            </div>
+          )}
         </div>
       )}
 

@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from backend.agent import chat as agent_chat, last_products
+from backend.agent import chat as agent_chat, last_cart, last_products
 from backend.audit import audit_report
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
@@ -54,12 +54,16 @@ class ChatRequest(BaseModel):
 
 
 # Run one turn of the real agent: it picks tools, remembers this conversation, and
-# logs every step to the audit trail. Returns the reply text plus any products the
-# agent surfaced this turn, so the UI can render them as cards.
+# logs every step to the audit trail. Returns the reply text, any products the
+# agent surfaced, and the current cart — so the UI can render cards and a summary.
 @app.post("/chat")
 def chat(request: ChatRequest):
     reply = agent_chat(request.conversation_id, request.message)
-    return {"reply": reply, "products": last_products(request.conversation_id)}
+    return {
+        "reply": reply,
+        "products": last_products(request.conversation_id),
+        "cart": last_cart(request.conversation_id),
+    }
 
 
 # Return one conversation's audit trail, plus whether its hash chain is intact.
