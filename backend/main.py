@@ -7,10 +7,10 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from backend.agent import chat as agent_chat
 from backend.audit import audit_report
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
-from backend.llm import get_provider
 from backend.models import Product
 from backend.payments import apply_webhook_event, verify_webhook_signature
 
@@ -25,9 +25,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Build the LLM provider once at startup (chosen by LLM_PROVIDER) and reuse it.
-provider = get_provider()
 
 
 # When someone sends a GET request to /health, run this function.
@@ -49,16 +46,19 @@ def list_products(max_price: int | None = None, category: str | None = None):
         return session.exec(query).all()
 
 
-# The shape of the JSON body that POST /chat expects: {"message": "..."}.
+# The shape of the JSON body POST /chat expects. conversation_id ties every turn
+# (and its audit trail) to one buyer session; the frontend sends a fresh id per page.
 class ChatRequest(BaseModel):
+    conversation_id: str
     message: str
 
 
-# Send one user message to the model and return its normalized reply.
+# Run one turn of the real agent: it picks tools, remembers this conversation, and
+# logs every step to the audit trail. Returns just the assistant's reply text.
 @app.post("/chat")
 def chat(request: ChatRequest):
-    messages = [{"role": "user", "content": request.message}]
-    return provider.chat(messages)
+    reply = agent_chat(request.conversation_id, request.message)
+    return {"reply": reply}
 
 
 # Return one conversation's audit trail, plus whether its hash chain is intact.
