@@ -469,11 +469,11 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Show the current cart + total
 - **Task 9.4 — Payment step**
   - [x] Show the Razorpay payment link / button
-  - [ ] A "waiting for payment…" state
+  - [x] A "waiting for payment…" state
 - **Task 9.5 — Live confirmation via SSE**
-  - [ ] Subscribe to SSE; show "Payment received ✅ — order confirmed"
+  - [x] Subscribe to SSE; show "Payment received ✅ — order confirmed"
 - **Task 9.6 — Audit panel**
-  - [ ] A side panel showing the live audit trail for judges
+  - [x] A side panel showing the live audit trail for judges
 
 ### Phase 10 — Graceful failure flow
 *Goal: the "one failure handled gracefully" the bar explicitly asks for.*
