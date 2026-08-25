@@ -5,8 +5,9 @@ const API = "http://127.0.0.1:8000";
 export default function App() {
   const [messages, setMessages] = useState([]); // each: { role: "user" | "assistant", text }
   const [input, setInput] = useState("");
+  const [products, setProducts] = useState([]);      // the agent's latest recommendations
   const [cid] = useState(() => crypto.randomUUID()); // one conversation (+ audit trail) per page load
-  const [busy, setBusy] = useState(false);          // true while waiting for the agent's reply
+  const [busy, setBusy] = useState(false);           // true while waiting for the agent's reply
 
   // Add the user's message, send it to the agent, then add the reply.
   async function send() {
@@ -24,6 +25,7 @@ export default function App() {
       if (!res.ok) throw new Error("bad status");
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
+      if (data.products && data.products.length) setProducts(data.products); // keep old cards if none this turn
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", text: "⚠️ Couldn't reach the agent. Please try again." }]);
     } finally {
@@ -57,6 +59,23 @@ export default function App() {
         ))}
         {busy && <p style={{ color: "#888" }}>CartPilot is typing…</p>}
       </div>
+
+      {/* Recommended product cards */}
+      {products.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <h3 style={{ margin: "0 0 8px" }}>Recommended</h3>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {products.map((p) => (
+              <div key={p.id} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, width: 170 }}>
+                <strong>{p.name}</strong>
+                <div style={{ color: "#555", fontSize: 13, margin: "4px 0" }}>{p.specs}</div>
+                <div style={{ fontWeight: "bold" }}>₹{(p.price / 100).toLocaleString("en-IN")}</div>
+                {p.reason && <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>{p.reason}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Input box: Enter or the Send button submits the form */}
       <form onSubmit={(e) => { e.preventDefault(); send(); }} style={{ display: "flex", gap: 8 }}>

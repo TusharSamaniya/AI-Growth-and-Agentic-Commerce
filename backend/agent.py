@@ -139,6 +139,9 @@ def run_agent(messages: list[dict], max_steps: int = 8, conversation_id: str | N
                     result = function(**c["arguments"])
                 except Exception as e:  # bad args or tool failure -> tell the model
                     result = {"error": str(e)}
+            # Remember any products the agent surfaced, so the UI can show cards.
+            if conversation_id and c["name"] in ("search_catalog", "recommend") and isinstance(result, list):
+                _last_products[conversation_id] = result
             messages.append({
                 "role": "tool",
                 "tool_call_id": c["id"],
@@ -154,13 +157,23 @@ def run_agent(messages: list[dict], max_steps: int = 8, conversation_id: str | N
 # In-memory on purpose: this resets when the server restarts, which is fine here.
 _conversations: dict[str, list[dict]] = {}
 
+# The products the agent surfaced on the latest turn of each conversation, so the
+# frontend can render them as cards. Reset at the start of every turn.
+_last_products: dict[str, list[dict]] = {}
+
 
 def chat(conversation_id: str, message: str) -> str:
     """Run one conversational turn, remembering the earlier messages."""
     record(conversation_id, "buyer_message", {"text": message})
+    _last_products[conversation_id] = []          # cards reflect THIS turn only
     history = _conversations.setdefault(conversation_id, [])
     history.append({"role": "user", "content": message})
     reply = run_agent(history, conversation_id=conversation_id)
     history.append({"role": "assistant", "content": reply})
     record(conversation_id, "agent_reply", {"text": reply})
     return reply
+
+
+def last_products(conversation_id: str) -> list[dict]:
+    """The products the agent surfaced on the latest turn (for the UI cards)."""
+    return _last_products.get(conversation_id, [])
