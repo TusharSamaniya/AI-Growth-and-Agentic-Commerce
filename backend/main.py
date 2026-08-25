@@ -12,7 +12,7 @@ from backend.audit import audit_report
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
 from backend.models import Product
-from backend.payments import apply_webhook_event, create_order, verify_webhook_signature
+from backend.payments import apply_webhook_event, create_order, get_payment_status, verify_webhook_signature
 from backend.tools import ConfirmationError, save_cart
 
 # Create the FastAPI application. This "app" is what Uvicorn runs.
@@ -104,6 +104,18 @@ def checkout(request: CheckoutRequest):
         "status": order["status"],
         "payment_link_url": order["payment_link_url"],
     }
+
+
+# The polling fallback to the webhook: ask Razorpay for this order's payment-link
+# status and sync our order to match. Unlike the webhook this needs no public
+# tunnel — the browser can call it directly — so it always works in a local demo.
+# It's how we DETECT a failure without depending on webhook delivery: an expired
+# or cancelled link advances our order to `failed` / `cancelled` and records the
+# status change in the audit trail. Only legal edges are taken, so re-polling a
+# settled order is a safe no-op.
+@app.get("/orders/{order_id}/status")
+def order_status(order_id: int):
+    return get_payment_status(order_id)
 
 
 # Return one conversation's audit trail, plus whether its hash chain is intact.

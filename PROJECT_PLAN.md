@@ -479,10 +479,10 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 *Goal: the "one failure handled gracefully" the bar explicitly asks for.*
 - **Task 10.1 — Trigger & detect a failure**
   - [ ] Use a failure test card / let the link time out
-  - [ ] Detect via webhook or polling → set the order to `failed`
+  - [x] Detect via webhook or polling → set the order to `failed`
 - **Task 10.2 — Agent recovery**
-  - [ ] Agent explains calmly ("no money moved")
-  - [ ] Offers options: retry / switch method / adjust cart
+  - [x] Agent explains calmly ("no money moved")
+  - [x] Offers options: retry / switch method / adjust cart
 - **Task 10.3 — Reissue & recover**
   - [ ] Create a fresh payment link; complete it successfully
 - **Task 10.4 — Audit the failure & recovery**

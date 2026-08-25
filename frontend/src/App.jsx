@@ -39,17 +39,19 @@ export default function App() {
   const [paying, setPaying] = useState(false);       // true while /checkout is in flight
   const [checkoutError, setCheckoutError] = useState(""); // a calm message if checkout fails
   const [paidOrderId, setPaidOrderId] = useState(null);   // which order the live event told us is paid
+  const [failedOrderId, setFailedOrderId] = useState(null); // which order the live event told us failed
   const [audit, setAudit] = useState(null);               // this conversation's audit trail (polled live)
 
   // Subscribe to the server's live event stream. When the payment webhook fires,
-  // the backend publishes a "payment_received" event and it arrives here instantly
-  // (no polling). We just note which order was paid; the render flips to green.
+  // the backend publishes a "payment_received" or "payment_failed" event and it
+  // arrives here instantly (no polling) — we note the order id; the render reacts.
   useEffect(() => {
     const es = new EventSource(`${API}/events`);
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
         if (data.type === "payment_received") setPaidOrderId(data.order_id);
+        if (data.type === "payment_failed") setFailedOrderId(data.order_id);
       } catch {
         // ignore keepalives and any non-JSON frames
       }
@@ -121,6 +123,8 @@ export default function App() {
 
   // The current order counts as paid once the live event names its id.
   const paid = order && order.order_id === paidOrderId;
+  // ...and failed once a failure event names it, so we can reassure the buyer.
+  const failed = order && order.order_id === failedOrderId;
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 24, maxWidth: 1000, margin: "0 auto", padding: 24, fontFamily: "sans-serif", alignItems: "flex-start" }}>
@@ -216,6 +220,24 @@ export default function App() {
             <div style={{ marginTop: 12, textAlign: "center", background: "#e6f4ea", border: "1px solid #a3d9b1", borderRadius: 8, padding: 12 }}>
               <div style={{ fontWeight: "bold", color: "#2b8a3e" }}>✅ Payment received — order confirmed</div>
               <div style={{ color: "#888", fontSize: 12, marginTop: 6 }}>Order #{order.order_id} · paid</div>
+            </div>
+          ) : failed ? (
+            <div style={{ marginTop: 12, textAlign: "center", background: "#fff5f5", border: "1px solid #ffc9c9", borderRadius: 8, padding: 12 }}>
+              <div style={{ fontWeight: "bold", color: "#c92a2a", marginBottom: 6 }}>⚠️ Payment didn't go through</div>
+              <div style={{ color: "#555", fontSize: 14 }}>Don't worry — no money moved, so you haven't been charged. Your cart is safe.</div>
+              {/* Recovery options. Retry / switch method reopen the still-open payment
+                  link (a declined attempt leaves it payable; Razorpay's page is where
+                  the buyer picks a method); adjust cart returns to the chat to change
+                  items. Minting a brand-new link for an expired cart is Task 10.3. */}
+              <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 10 }}>
+                <a href={order.payment_link_url} target="_blank" rel="noreferrer" onClick={() => setFailedOrderId(null)}
+                   style={{ padding: "6px 12px", background: "#2b8a3e", color: "#fff", borderRadius: 6, textDecoration: "none", fontSize: 13 }}>Retry payment</a>
+                <a href={order.payment_link_url} target="_blank" rel="noreferrer" onClick={() => setFailedOrderId(null)}
+                   style={{ padding: "6px 12px", background: "#fff", color: "#333", border: "1px solid #ccc", borderRadius: 6, textDecoration: "none", fontSize: 13 }}>Switch method</a>
+                <button onClick={() => { setOrder(null); setFailedOrderId(null); }}
+                   style={{ padding: "6px 12px", background: "#fff", color: "#333", border: "1px solid #ccc", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>Adjust cart</button>
+              </div>
+              <div style={{ color: "#888", fontSize: 12, marginTop: 10 }}>Order #{order.order_id} · payment failed</div>
             </div>
           ) : (
             <div style={{ marginTop: 12, textAlign: "center", background: "#fff8e1", border: "1px solid #ffe08a", borderRadius: 8, padding: 12 }}>

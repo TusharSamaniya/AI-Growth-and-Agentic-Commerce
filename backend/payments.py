@@ -216,6 +216,8 @@ def apply_webhook_event(payload: dict) -> str:
 
     if target == "paid":           # nudge every open SSE subscriber, live
         publish(json.dumps({"type": "payment_received", "order_id": order_id}))
+    if target == "failed":         # tell subscribers so the UI can recover gracefully
+        publish(json.dumps({"type": "payment_failed", "order_id": order_id}))
     if conversation_id:            # log the status change to the audit trail
         record(conversation_id, "status_change", {
             "order_id": order_id, "from": from_status, "to": target,
