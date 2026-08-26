@@ -224,3 +224,41 @@ def apply_webhook_event(payload: dict) -> str:
             "event": event, "source": "webhook",
         })
     return f"{event}: order {order_id} -> {target}"
+
+
+def simulate_payment_outcome(order_id: int, outcome: str) -> dict:
+    """DEV/DEMO ONLY — fabricate a payment outcome for one of OUR orders by id.
+
+    Does exactly what a verified webhook would do — advance the order along the
+    state machine, tell live SSE subscribers, and log the change — but is
+    triggered by hand instead of by Razorpay, so the paid / failed UI can be
+    demoed locally without a public webhook tunnel. It moves NO money; the audit
+    entry is stamped source "simulated" so the ledger never pretends otherwise.
+    Only a legal transition is applied, else an error dict is returned.
+    """
+    target = {"paid": "paid", "failed": "failed"}.get(outcome)
+    if target is None:
+        return {"error": f"outcome must be 'paid' or 'failed', got {outcome!r}"}
+
+    with Session(engine) as session:
+        order = session.get(Order, order_id)
+        if order is None:
+            return {"error": f"order {order_id} not found"}
+        if target not in ORDER_TRANSITIONS[order.status]:
+            return {"error": f"order {order_id} is {order.status}; can't go to {target}"}
+        from_status = order.status
+        conversation_id = order.conversation_id
+        order.set_status(target)   # still the enforcer of legal edges
+        session.add(order)
+        session.commit()
+
+    if target == "paid":
+        publish(json.dumps({"type": "payment_received", "order_id": order_id}))
+    if target == "failed":
+        publish(json.dumps({"type": "payment_failed", "order_id": order_id}))
+    if conversation_id:
+        record(conversation_id, "status_change", {
+            "order_id": order_id, "from": from_status, "to": target,
+            "source": "simulated",
+        })
+    return {"order_id": order_id, "from": from_status, "to": target}

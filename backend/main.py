@@ -12,7 +12,7 @@ from backend.audit import audit_report, record
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
 from backend.models import Product
-from backend.payments import apply_webhook_event, create_order, get_payment_status, verify_webhook_signature
+from backend.payments import apply_webhook_event, create_order, get_payment_status, simulate_payment_outcome, verify_webhook_signature
 from backend.tools import ConfirmationError, save_cart
 
 # Create the FastAPI application. This "app" is what Uvicorn runs.
@@ -22,7 +22,11 @@ app = FastAPI()
 # browser. Without CORS the browser blocks these cross-origin requests.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    # Match ANY localhost port (and 127.0.0.1) instead of hard-coding 5173. Vite
+    # jumps to 5174/5175/... whenever the previous port is still in use, and the
+    # dev page can be opened as either localhost or 127.0.0.1 — pinning one port
+    # silently blocks the browser (the "Couldn't reach the agent" trap).
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -119,6 +123,20 @@ def checkout(request: CheckoutRequest):
 @app.get("/orders/{order_id}/status")
 def order_status(order_id: int):
     return get_payment_status(order_id)
+
+
+# DEV/DEMO ONLY — no money moves here. This is the manual twin of the Razorpay
+# webhook: it fires the exact same "payment_received" / "payment_failed" event
+# (plus the same order transition and audit entry) for one of OUR order ids, so
+# the live paid / failed UI can be demoed locally without exposing /webhook
+# through a public tunnel. The audit entry is stamped source "simulated" so the
+# trail stays honest. Remove this route before any real deployment.
+@app.post("/simulate/{order_id}/{outcome}")
+def simulate(order_id: int, outcome: str):
+    result = simulate_payment_outcome(order_id, outcome)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 # The shape POST /recovery expects: which conversation, the order that failed,
