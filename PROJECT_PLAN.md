@@ -484,9 +484,9 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
   - [x] Agent explains calmly ("no money moved")
   - [x] Offers options: retry / switch method / adjust cart
 - **Task 10.3 — Reissue & recover**
-  - [ ] Create a fresh payment link; complete it successfully
+  - [x] Create a fresh payment link; complete it successfully
 - **Task 10.4 — Audit the failure & recovery**
-  - [ ] Log the failure reason, the options offered, the choice, and the recovery
+  - [x] Log the failure reason, the options offered, the choice, and the recovery
 
 ### Phase 11 — Polish & impress (stretch — pick what fits)
 *Goal: the extras that lift a good demo to a winning one.*

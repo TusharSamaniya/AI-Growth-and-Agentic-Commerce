@@ -5,13 +5,14 @@ const API = "http://127.0.0.1:8000";
 // Format a paise integer as rupees, e.g. 899900 -> "₹8,999".
 const rupees = (paise) => `₹${(paise / 100).toLocaleString("en-IN")}`;
 
-// A light background per audit action, so judges can scan the trail by type.
+// A light background color per audit action, so judges can scan the trail by type.
 const ACTION_COLOR = {
   buyer_message: "#e7f1ff",
   agent_decision: "#efe7ff",
   agent_reply: "#e9ecef",
   order_created: "#fff3cd",
   status_change: "#e6f4ea",
+  recovery: "#ffe8cc",
 };
 
 // A short, human-readable line for one audit entry, based on its action + data.
@@ -22,7 +23,11 @@ function summarize(entry) {
     case "agent_reply": return d.text;
     case "agent_decision": return `tool: ${d.tool}`;
     case "order_created": return `order #${d.order_id} · ${rupees(d.amount)} · ${d.status}`;
-    case "status_change": return `${d.from} → ${d.to}`;
+    case "status_change": {
+      const reason = d.razorpay_status || d.event;   // the failure/settlement reason, if any
+      return `${d.from} → ${d.to}${reason ? ` (${reason})` : ""}`;
+    }
+    case "recovery": return `chose "${d.choice}" · offered ${(d.options || []).join(" / ")}`;
     default: return JSON.stringify(d);
   }
 }
@@ -37,14 +42,15 @@ export default function App() {
   const [email, setEmail] = useState("test@example.com"); // where Razorpay sends the payment link
   const [order, setOrder] = useState(null);          // the checkout result (Razorpay payment link)
   const [paying, setPaying] = useState(false);       // true while /checkout is in flight
+  const [attempt, setAttempt] = useState(1);         // payment attempt #; a retry bumps it for a fresh link
   const [checkoutError, setCheckoutError] = useState(""); // a calm message if checkout fails
   const [paidOrderId, setPaidOrderId] = useState(null);   // which order the live event told us is paid
   const [failedOrderId, setFailedOrderId] = useState(null); // which order the live event told us failed
   const [audit, setAudit] = useState(null);               // this conversation's audit trail (polled live)
 
   // Subscribe to the server's live event stream. When the payment webhook fires,
-  // the backend publishes a "payment_received" or "payment_failed" event and it
-  // arrives here instantly (no polling) — we note the order id; the render reacts.
+  // the backend publishes a "payment_received" or "payment_failed" event, and it
+  // arrives here instantly (no polling); we note the order id and the render reacts.
   useEffect(() => {
     const es = new EventSource(`${API}/events`);
     es.onmessage = (e) => {
@@ -102,7 +108,7 @@ export default function App() {
 
   // The buyer's explicit "Confirm & Pay": turn the current cart into a Razorpay
   // payment link. This is the only action that moves money.
-  async function checkout() {
+  async function checkout(attemptNum = attempt) {
     if (paying) return;
     setPaying(true);
     setCheckoutError("");
@@ -110,7 +116,7 @@ export default function App() {
       const res = await fetch(`${API}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversation_id: cid, email }),
+        body: JSON.stringify({ conversation_id: cid, email, attempt: attemptNum }),
       });
       if (!res.ok) throw new Error("bad status");
       setOrder(await res.json());
@@ -119,6 +125,30 @@ export default function App() {
     } finally {
       setPaying(false);
     }
+  }
+
+  // Best-effort: record the buyer's recovery choice (with the options we offered)
+  // to the audit trail, so the failure→recovery decision is part of the
+  // tamper-evident story. Returns the fetch so a reissue can await it first —
+  // that keeps the ledger's hash chain written one entry at a time.
+  function logRecovery(choice) {
+    return fetch(`${API}/recovery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: cid, failed_order_id: order?.order_id, choice }),
+    }).catch(() => {}); // a failed log must never block the actual recovery
+  }
+
+  // Reissue after a failure: log the choice, then bump the attempt so the backend
+  // sees a NEW idempotency key and mints a FRESH payment link (instead of
+  // returning the failed order). The buyer can then pay this new link and succeed.
+  async function retry(choice) {
+    await logRecovery(choice);
+    const next = attempt + 1;
+    setAttempt(next);
+    setOrder(null);
+    setFailedOrderId(null);
+    checkout(next);
   }
 
   // The current order counts as paid once the live event names its id.
@@ -203,7 +233,7 @@ export default function App() {
                 style={{ width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }}
               />
               <button
-                onClick={checkout}
+                onClick={() => checkout()}
                 disabled={paying}
                 style={{ width: "100%", padding: 10, background: "#2b8a3e", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
               >
@@ -225,16 +255,17 @@ export default function App() {
             <div style={{ marginTop: 12, textAlign: "center", background: "#fff5f5", border: "1px solid #ffc9c9", borderRadius: 8, padding: 12 }}>
               <div style={{ fontWeight: "bold", color: "#c92a2a", marginBottom: 6 }}>⚠️ Payment didn't go through</div>
               <div style={{ color: "#555", fontSize: 14 }}>Don't worry — no money moved, so you haven't been charged. Your cart is safe.</div>
-              {/* Recovery options. Retry / switch method reopen the still-open payment
-                  link (a declined attempt leaves it payable; Razorpay's page is where
-                  the buyer picks a method); adjust cart returns to the chat to change
-                  items. Minting a brand-new link for an expired cart is Task 10.3. */}
+              {/* Recovery options. Retry / switch method reissue a FRESH payment link
+                  (a bumped attempt = a new idempotency key, so create_order mints a new
+                  link the buyer can actually complete — works even if the old one
+                  expired); adjust cart bumps the attempt too, then drops back to the
+                  cart to change items before paying again. */}
               <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 10 }}>
-                <a href={order.payment_link_url} target="_blank" rel="noreferrer" onClick={() => setFailedOrderId(null)}
-                   style={{ padding: "6px 12px", background: "#2b8a3e", color: "#fff", borderRadius: 6, textDecoration: "none", fontSize: 13 }}>Retry payment</a>
-                <a href={order.payment_link_url} target="_blank" rel="noreferrer" onClick={() => setFailedOrderId(null)}
-                   style={{ padding: "6px 12px", background: "#fff", color: "#333", border: "1px solid #ccc", borderRadius: 6, textDecoration: "none", fontSize: 13 }}>Switch method</a>
-                <button onClick={() => { setOrder(null); setFailedOrderId(null); }}
+                <button onClick={() => retry("retry")}
+                   style={{ padding: "6px 12px", background: "#2b8a3e", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>Retry payment</button>
+                <button onClick={() => retry("switch_method")}
+                   style={{ padding: "6px 12px", background: "#fff", color: "#333", border: "1px solid #ccc", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>Switch method</button>
+                <button onClick={() => { logRecovery("adjust_cart"); setOrder(null); setFailedOrderId(null); setAttempt((a) => a + 1); }}
                    style={{ padding: "6px 12px", background: "#fff", color: "#333", border: "1px solid #ccc", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>Adjust cart</button>
               </div>
               <div style={{ color: "#888", fontSize: 12, marginTop: 10 }}>Order #{order.order_id} · payment failed</div>

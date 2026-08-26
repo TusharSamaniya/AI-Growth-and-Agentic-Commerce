@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from backend.agent import chat as agent_chat, last_cart, last_products
-from backend.audit import audit_report
+from backend.audit import audit_report, record
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
 from backend.models import Product
@@ -72,6 +72,7 @@ def chat(request: ChatRequest):
 class CheckoutRequest(BaseModel):
     conversation_id: str
     email: str
+    attempt: int = 1  # which payment attempt; a retry bumps it for a fresh link
 
 
 # The buyer's explicit "Confirm & Pay". This is the ONLY path that creates a
@@ -80,8 +81,10 @@ class CheckoutRequest(BaseModel):
 # "a human clicked Pay". We take the cart the agent last built for this
 # conversation, persist it, and hand it to create_order, which runs the
 # confirmation gate before creating the Razorpay order + payment link. The
-# conversation_id doubles as the idempotency key, so a double-click returns the
-# same order instead of charging twice.
+# idempotency key is conversation_id + attempt number: a double-click (same
+# attempt) returns the same order instead of charging twice, while a retry
+# (bumped attempt) gets a FRESH key, so create_order mints a NEW payment link to
+# recover from a failure instead of returning the failed order.
 @app.post("/checkout")
 def checkout(request: CheckoutRequest):
     cart = last_cart(request.conversation_id)
@@ -93,7 +96,7 @@ def checkout(request: CheckoutRequest):
             saved,
             {"email": request.email},
             confirmed=True,
-            idempotency_key=request.conversation_id,
+            idempotency_key=f"{request.conversation_id}#{request.attempt}",
             conversation_id=request.conversation_id,
         )
     except ConfirmationError as e:
@@ -116,6 +119,29 @@ def checkout(request: CheckoutRequest):
 @app.get("/orders/{order_id}/status")
 def order_status(order_id: int):
     return get_payment_status(order_id)
+
+
+# The shape POST /recovery expects: which conversation, the order that failed,
+# and which recovery option the buyer chose on the failed-payment panel.
+class RecoveryRequest(BaseModel):
+    conversation_id: str
+    failed_order_id: int
+    choice: str  # "retry" | "switch_method" | "adjust_cart"
+
+
+# Log the buyer's recovery decision to the audit trail. The failure itself and
+# the reissued order are already recorded (status_change -> failed, then a fresh
+# order_created), so this fills the one gap the backend can't see on its own: the
+# human choice made on the failed-payment panel — the options we offered and
+# which one was picked. That completes the failure -> recovery story in the ledger.
+@app.post("/recovery")
+def recovery(request: RecoveryRequest):
+    record(request.conversation_id, "recovery", {
+        "failed_order_id": request.failed_order_id,
+        "options": ["retry", "switch_method", "adjust_cart"],
+        "choice": request.choice,
+    })
+    return {"status": "ok"}
 
 
 # Return one conversation's audit trail, plus whether its hash chain is intact.
