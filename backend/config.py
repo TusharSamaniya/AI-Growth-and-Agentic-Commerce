@@ -5,6 +5,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
+    # PostgreSQL connection string. The real value lives in .env as DATABASE_URL;
+    # this default is the local dev database so the app still boots without it.
+    database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/cartpilot"
+
     razorpay_key_id: str
     razorpay_key_secret: str
     groq_api_key: str

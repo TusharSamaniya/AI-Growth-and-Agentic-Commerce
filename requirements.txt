@@ -9,4 +9,5 @@ razorpay
 groq
 openai
 sqlmodel
+psycopg2-binary
 pytest

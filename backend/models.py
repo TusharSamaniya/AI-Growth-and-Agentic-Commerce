@@ -6,7 +6,7 @@ from sqlmodel import Field, SQLModel
 class Product(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
-    category: str          # e.g. "phone", "case", "screen_guard"
+    category: str          # e.g. "phone", "case", "screen_guard", "charger", "earbuds", "power_bank"
     brand: str
     price: int             # in paise: ₹1 = 100 paise, matches Razorpay
     specs: str             # short description, e.g. "6GB RAM, 128GB"

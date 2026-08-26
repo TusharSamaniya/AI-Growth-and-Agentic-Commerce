@@ -28,7 +28,7 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "query": {"type": "string", "description": "Words to match in name/specs/brand"},
                     "max_price": {"type": "integer", "description": "Highest price, in paise"},
-                    "filters": {"type": "object", "description": 'Exact filters. Valid categories: "phone", "case", "screen_guard". Example: {"category": "phone"}'},
+                    "filters": {"type": "object", "description": 'Exact filters. Valid categories: "phone", "case", "screen_guard", "charger", "earbuds", "power_bank". Example: {"category": "phone"}'},
                 },
             },
         },
