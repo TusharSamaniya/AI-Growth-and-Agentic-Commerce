@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from backend.agent import chat as agent_chat, last_cart, last_products
+from backend.agent import active_cart, chat as agent_chat, last_cart, last_products
 from backend.audit import audit_report, record
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
@@ -91,7 +91,7 @@ class CheckoutRequest(BaseModel):
 # recover from a failure instead of returning the failed order.
 @app.post("/checkout")
 def checkout(request: CheckoutRequest):
-    cart = last_cart(request.conversation_id)
+    cart = active_cart(request.conversation_id)  # persistent cart, safe across turns
     if not cart.get("items"):
         raise HTTPException(status_code=400, detail="no cart to check out")
     saved = save_cart(cart["items"])
