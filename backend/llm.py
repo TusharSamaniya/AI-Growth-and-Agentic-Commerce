@@ -19,12 +19,28 @@ class LLMProvider(ABC):
         """Send the conversation (and optional tool schemas) to the model and return its reply."""
 
 
+def _parse_args(raw: str):
+    """Parse a tool call's JSON arguments, tolerating an empty or malformed string.
+
+    A smaller model (like gpt-oss-20b) occasionally emits arguments that aren't
+    valid JSON. Without this guard, json.loads would raise here — inside the LLM
+    call, before the agent's tool try/except — and crash the whole /chat request
+    (the "Couldn't reach the agent" bug). Falling back to {} keeps the server up:
+    the tool runs with its defaults, or fails gracefully and the agent (which
+    already handles tool errors) simply tries again.
+    """
+    try:
+        return json.loads(raw) if raw else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
 def _normalize(message):
     """Turn a provider's raw reply into a plain, provider-independent dict."""
     return {
         "text": message.content,
         "tool_calls": [
-            {"id": c.id, "name": c.function.name, "arguments": json.loads(c.function.arguments)}
+            {"id": c.id, "name": c.function.name, "arguments": _parse_args(c.function.arguments)}
             for c in (message.tool_calls or [])
         ],
     }
