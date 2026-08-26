@@ -3,6 +3,7 @@
 # The tool-call round-trip was first proven in scripts/groq_tool_call.py.
 
 import json
+import traceback
 
 from backend.audit import record
 from backend.llm import get_provider
@@ -183,7 +184,18 @@ def chat(conversation_id: str, message: str) -> str:
     _last_cart[conversation_id] = {}              # cart summary reflects THIS turn only
     history = _conversations.setdefault(conversation_id, [])
     history.append({"role": "user", "content": message})
-    reply = run_agent(history, conversation_id=conversation_id)
+    try:
+        reply = run_agent(history, conversation_id=conversation_id)
+    except Exception:
+        # A crash here (most often the LLM call) must NOT surface to the buyer as
+        # the blank "Couldn't reach the agent" error. Print the full traceback to
+        # the server console, boxed so it's easy to spot and copy, then reply
+        # calmly so the buyer can simply retry.
+        print("\n" + "=" * 60)
+        print("AGENT ERROR on this turn — copy everything below to debug:")
+        traceback.print_exc()
+        print("=" * 60 + "\n")
+        reply = "Sorry, I hit a snag on that step — please try that again."
     history.append({"role": "assistant", "content": reply})
     record(conversation_id, "agent_reply", {"text": reply})
     return reply
