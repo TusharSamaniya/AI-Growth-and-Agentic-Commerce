@@ -32,6 +32,28 @@ function summarize(entry) {
   }
 }
 
+// The four merchant KPIs, shown as a live strip of stat tiles across the top.
+function MetricsStrip({ metrics }) {
+  if (!metrics) return null;
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  const tiles = [
+    { label: "Conversion", value: pct(metrics.conversion_rate) },
+    { label: "Avg order value", value: rupees(metrics.avg_order_value) },
+    { label: "Upsell attach rate", value: pct(metrics.upsell_attach_rate) },
+    { label: "Recovered carts", value: metrics.recovered_carts },
+  ];
+  return (
+    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+      {tiles.map((t) => (
+        <div key={t.label} style={{ flex: 1, minWidth: 130, border: "1px solid #ddd", borderRadius: 8, padding: 12 }}>
+          <div style={{ fontSize: 12, color: "#888" }}>{t.label}</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", marginTop: 4 }}>{t.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   const [messages, setMessages] = useState([]); // each: { role: "user" | "assistant", text }
   const [input, setInput] = useState("");
@@ -77,6 +99,20 @@ export default function App() {
     const timer = setInterval(load, 2000);
     return () => clearInterval(timer);
   }, [cid]);
+
+  // The merchant metrics for the top strip: kept in state and polled every few
+  // seconds so the KPIs update live as orders get paid or recovered.
+  const [metrics, setMetrics] = useState(null);
+  useEffect(() => {
+    const load = () =>
+      fetch(`${API}/metrics`)
+        .then((r) => r.json())
+        .then(setMetrics)
+        .catch(() => {}); // a transient miss just keeps the last numbers on screen
+    load();
+    const timer = setInterval(load, 3000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Add the user's message, send it to the agent, then add the reply.
   async function send() {
@@ -157,9 +193,14 @@ export default function App() {
   const failed = order && order.order_id === failedOrderId;
 
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 24, maxWidth: 1000, margin: "0 auto", padding: 24, fontFamily: "sans-serif", alignItems: "flex-start" }}>
-      <div style={{ flex: 1, minWidth: 320 }}>
-        <h1>CartPilot</h1>
+    <div style={{ maxWidth: 1000, margin: "0 auto", padding: 24, fontFamily: "sans-serif" }}>
+      <h1 style={{ marginBottom: 16 }}>CartPilot</h1>
+
+      {/* Merchant metrics: four live KPIs across the top for the judges. */}
+      <MetricsStrip metrics={metrics} />
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: 320 }}>
 
       {/* Message list */}
       <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, minHeight: 320, marginBottom: 12 }}>
@@ -326,6 +367,7 @@ export default function App() {
           <p style={{ color: "#888", fontSize: 13 }}>No activity yet — start chatting.</p>
         )}
       </aside>
+      </div>
     </div>
   );
 }
