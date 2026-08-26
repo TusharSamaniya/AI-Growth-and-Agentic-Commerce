@@ -11,6 +11,7 @@ from backend.agent import active_cart, chat as agent_chat, last_cart, last_produ
 from backend.audit import audit_report, record
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
+from backend.metrics import merchant_metrics
 from backend.models import Product
 from backend.payments import apply_webhook_event, create_order, get_payment_status, simulate_payment_outcome, verify_webhook_signature
 from backend.tools import ConfirmationError, save_cart
@@ -49,6 +50,13 @@ def list_products(max_price: int | None = None, category: str | None = None):
         query = query.where(Product.category == category)
     with Session(engine) as session:
         return session.exec(query).all()
+
+
+# Merchant KPIs for the dashboard: conversion, avg order value, upsell attach
+# rate, and recovered carts — all read-only, computed from data we already store.
+@app.get("/metrics")
+def metrics():
+    return merchant_metrics()
 
 
 # The shape of the JSON body POST /chat expects. conversation_id ties every turn
