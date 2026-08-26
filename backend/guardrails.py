@@ -31,7 +31,9 @@ def enforce_order(cart: dict) -> None:
     total = cart.get("total", 0)
     cap = GUARDRAILS["max_order_amount"]
     if total > cap:
-        raise GuardrailError(f"order total {total} paise exceeds the cap of {cap} paise")
+        raise GuardrailError(
+            f"This order (Rs {total // 100:,}) is above the single-order limit of Rs {cap // 100:,}."
+        )
 
     allowed = set(GUARDRAILS["allowed_categories"])
     with Session(engine) as session:

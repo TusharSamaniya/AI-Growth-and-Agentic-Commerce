@@ -14,6 +14,7 @@ from backend.audit import record
 from backend.config import settings
 from backend.database import engine
 from backend.events import publish
+from backend.guardrails import GuardrailError, enforce_order
 from backend.models import ORDER_TRANSITIONS, Order
 from backend.tools import require_confirmation
 
@@ -48,6 +49,15 @@ def create_order(cart: dict, contact: dict, confirmed: bool, idempotency_key: st
 
     amount = cart["total"]  # paise — Razorpay also works in paise
     require_confirmation(cart, amount, contact, confirmed)  # gate: raises if not OK
+
+    # Second gate: the merchant's guardrails. Refuse a rule-breaking order BEFORE
+    # any Razorpay artifact exists, and record the refusal so it stays explainable.
+    try:
+        enforce_order(cart)
+    except GuardrailError as e:
+        if conversation_id:
+            record(conversation_id, "guardrail_blocked", {"amount": amount, "reason": str(e)})
+        raise
 
     rzp_order = _client.order.create({
         "amount": amount,

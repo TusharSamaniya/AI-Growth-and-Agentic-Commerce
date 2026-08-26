@@ -11,6 +11,7 @@ from backend.agent import active_cart, chat as agent_chat, last_cart, last_produ
 from backend.audit import audit_report, record
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
+from backend.guardrails import GuardrailError
 from backend.metrics import merchant_metrics
 from backend.models import Product
 from backend.payments import apply_webhook_event, create_order, get_payment_status, simulate_payment_outcome, verify_webhook_signature
@@ -111,7 +112,7 @@ def checkout(request: CheckoutRequest):
             idempotency_key=f"{request.conversation_id}#{request.attempt}",
             conversation_id=request.conversation_id,
         )
-    except ConfirmationError as e:
+    except (ConfirmationError, GuardrailError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {
         "order_id": order["id"],

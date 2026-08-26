@@ -13,6 +13,7 @@ const ACTION_COLOR = {
   order_created: "#fff3cd",
   status_change: "#e6f4ea",
   recovery: "#ffe8cc",
+  guardrail_blocked: "#ffe3e3",
 };
 
 // A short, human-readable line for one audit entry, based on its action + data.
@@ -28,6 +29,7 @@ function summarize(entry) {
       return `${d.from} → ${d.to}${reason ? ` (${reason})` : ""}`;
     }
     case "recovery": return `chose "${d.choice}" · offered ${(d.options || []).join(" / ")}`;
+    case "guardrail_blocked": return d.reason;
     default: return JSON.stringify(d);
   }
 }
@@ -154,8 +156,13 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversation_id: cid, email, attempt: attemptNum }),
       });
-      if (!res.ok) throw new Error("bad status");
-      setOrder(await res.json());
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Show the server's explainable reason (e.g. a guardrail block), not a generic line.
+        setCheckoutError(`⚠️ ${data.detail || "Couldn't start checkout. Please try again."}`);
+        return;
+      }
+      setOrder(data);
     } catch {
       setCheckoutError("⚠️ Couldn't start checkout. Please try again.");
     } finally {
