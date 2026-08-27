@@ -116,6 +116,27 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // While an order is awaiting payment, poll its REAL status straight from
+  // Razorpay. A link that expires or is cancelled sends no webhook, so without
+  // this the screen would hang on "Waiting…" forever; polling also lets a locally
+  // run app confirm a real payment with no public webhook tunnel. The moment the
+  // order resolves we set the same paid/failed state the SSE events use (so the
+  // existing panels react), then this effect re-runs, hits the guard, and stops.
+  useEffect(() => {
+    if (!order) return;                                                        // nothing to watch yet
+    if (order.order_id === paidOrderId || order.order_id === failedOrderId) return; // already resolved
+    const check = () =>
+      fetch(`${API}/orders/${order.order_id}/status`)
+        .then((r) => r.json())
+        .then((s) => {
+          if (s.order_status === "paid") setPaidOrderId(order.order_id);
+          if (s.order_status === "failed" || s.order_status === "cancelled") setFailedOrderId(order.order_id);
+        })
+        .catch(() => {}); // a transient miss just retries next tick
+    const timer = setInterval(check, 4000);
+    return () => clearInterval(timer);
+  }, [order, paidOrderId, failedOrderId]);
+
   // Add the user's message, send it to the agent, then add the reply.
   async function send() {
     const text = input.trim();
