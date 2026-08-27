@@ -34,6 +34,98 @@ function summarize(entry) {
   }
 }
 
+// A rich, human explanation of one audit entry: what happened, the key numbers,
+// WHY it happened, and the expected impact — all derived from data we already
+// record (never guessed). Returns null for plain chat lines, which show as text.
+function explain(entry) {
+  const d = entry.data || {};
+  switch (entry.action) {
+    case "agent_decision":
+      return explainTool(d.tool, d.arguments || {}, d.result);
+    case "order_created":
+      return {
+        action: "Created order & payment link",
+        params: `Order #${d.order_id} · ${rupees(d.amount)}`,
+        rationale: "Buyer confirmed the cart and clicked Pay",
+        expected_impact: "Razorpay link issued; order now awaiting payment",
+      };
+    case "status_change": {
+      const reason = d.razorpay_status || d.event;
+      const impact = d.to === "paid" ? "Order confirmed — money received"
+        : d.to === "failed" ? "Buyer offered recovery options"
+        : d.to === "cancelled" ? "Order called off; nothing charged"
+        : "Order advanced along its lifecycle";
+      return {
+        action: "Payment status changed",
+        params: `${d.from} → ${d.to}`,
+        rationale: `Reported by ${d.source}${reason ? ` (${reason})` : ""}`,
+        expected_impact: impact,
+      };
+    }
+    case "recovery":
+      return {
+        action: "Buyer chose a recovery option",
+        params: d.choice,
+        rationale: "The previous payment attempt failed",
+        expected_impact: d.choice === "adjust_cart"
+          ? "Back to the cart to change items, then pay again"
+          : "A fresh payment link is issued to try again",
+      };
+    case "guardrail_blocked":
+      return {
+        action: "Checkout blocked (guardrail)",
+        params: rupees(d.amount),
+        rationale: d.reason,
+        expected_impact: "No order created; buyer told why",
+      };
+    case "webhook_rejected":
+      return {
+        action: "Forged webhook rejected",
+        params: d.reason,
+        rationale: "Signature didn't match our secret — not really from Razorpay",
+        expected_impact: "Fake payment blocked; nothing charged",
+      };
+    default:
+      return null; // buyer_message / agent_reply -> plain text
+  }
+}
+
+// The four fields for one agent tool-call decision.
+function explainTool(tool, args, result) {
+  switch (tool) {
+    case "search_catalog":
+      return {
+        action: "Searched the catalog",
+        params: args.query ? `"${args.query}"` : "all products",
+        rationale: "Looks up real products before answering — never invents them",
+        expected_impact: result || "Finds matching products to recommend",
+      };
+    case "recommend":
+      return {
+        action: "Ranked recommendations",
+        params: args.preferences ? `by "${args.preferences}"` : "by best fit",
+        rationale: "Matches products to what the buyer asked for",
+        expected_impact: result || "Shows the best few options, each with a reason",
+      };
+    case "build_cart":
+      return {
+        action: "Built the cart",
+        params: `${(args.product_ids || []).length} item(s)${args.budget ? ` · budget ${rupees(args.budget)}` : ""}`,
+        rationale: "Buyer selected these products",
+        expected_impact: result || "Cart shown for confirmation before any payment",
+      };
+    case "suggest_addons":
+      return {
+        action: "Suggested add-ons",
+        params: args.budget ? `within ${rupees(args.budget)} budget` : "within budget",
+        rationale: "Only accessories that fit the remaining budget",
+        expected_impact: result || "Bounded upsell — never pushes the total over budget",
+      };
+    default:
+      return { action: `Tool: ${tool}`, params: JSON.stringify(args), rationale: "Agent step", expected_impact: result || "—" };
+  }
+}
+
 // The four merchant KPIs, shown as a live strip of stat tiles across the top.
 function MetricsStrip({ metrics }) {
   if (!metrics) return null;
@@ -391,13 +483,27 @@ export default function App() {
             <div style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8, color: audit.verified ? "#2b8a3e" : "#c00" }}>
               {audit.verified ? "✔ Chain verified" : "✖ Chain broken"}
             </div>
-            {audit.entries.map((e) => (
-              <div key={e.id} style={{ background: ACTION_COLOR[e.action] || "#f1f3f5", borderRadius: 6, padding: "6px 8px", marginBottom: 6 }}>
-                <div style={{ fontSize: 12, fontWeight: "bold" }}>{e.action}</div>
-                <div style={{ fontSize: 12, color: "#333", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{summarize(e)}</div>
-                <div style={{ fontSize: 10, color: "#999", fontFamily: "monospace" }}>#{e.hash.slice(0, 12)}…</div>
-              </div>
-            ))}
+            {audit.entries.map((e) => {
+              const ex = explain(e);   // rich four-field card, or null for plain chat lines
+              return (
+                <div key={e.id} style={{ background: ACTION_COLOR[e.action] || "#f1f3f5", borderRadius: 6, padding: "6px 8px", marginBottom: 6 }}>
+                  {ex ? (
+                    <>
+                      <div style={{ fontSize: 12, fontWeight: "bold" }}>{ex.action}</div>
+                      <div style={{ fontSize: 11, color: "#333", marginTop: 2 }}><b>Params:</b> {ex.params}</div>
+                      <div style={{ fontSize: 11, color: "#333" }}><b>Why:</b> {ex.rationale}</div>
+                      <div style={{ fontSize: 11, color: "#333" }}><b>Impact:</b> {ex.expected_impact}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 12, fontWeight: "bold" }}>{e.action === "buyer_message" ? "Buyer" : e.action === "agent_reply" ? "CartPilot" : e.action}</div>
+                      <div style={{ fontSize: 12, color: "#333", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{summarize(e)}</div>
+                    </>
+                  )}
+                  <div style={{ fontSize: 10, color: "#999", fontFamily: "monospace", marginTop: 2 }}>#{e.hash.slice(0, 12)}…</div>
+                </div>
+              );
+            })}
           </>
         ) : (
           <p style={{ color: "#888", fontSize: 13 }}>No activity yet — start chatting.</p>

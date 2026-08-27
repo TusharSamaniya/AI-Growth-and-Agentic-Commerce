@@ -100,6 +100,27 @@ Rules you must always follow:
 Prices are stored in paise (Rs 1 = 100 paise), so a 10000 rupee budget means 1000000 paise. Always show prices to the buyer in rupees."""
 
 
+def _result_summary(tool: str, result) -> str:
+    """A short, human one-line summary of what a tool returned, logged next to the
+    decision so the audit trail's "Impact" shows the REAL outcome (e.g. the actual
+    cart total) — not just what the agent asked for. Prices shown in rupees."""
+    if isinstance(result, dict) and "error" in result:
+        return f"error: {result['error']}"
+    if tool in ("search_catalog", "recommend") and isinstance(result, list):
+        return f"found {len(result)} product(s)"
+    if tool == "suggest_addons" and isinstance(result, list):
+        return f"{len(result)} add-on(s) fit the budget"
+    if tool == "build_cart" and isinstance(result, dict):
+        n = len(result.get("items", []))
+        note = ""
+        if result.get("over_budget"):
+            note = f" — OVER budget by Rs {result.get('over_by', 0) // 100:,}"
+        elif "over_budget" in result:
+            note = " — within budget"
+        return f"cart: {n} item(s), total Rs {result.get('total', 0) // 100:,}{note}"
+    return "done"
+
+
 def run_agent(messages: list[dict], max_steps: int = 8, conversation_id: str | None = None) -> str:
     """Let the model call tools until it produces a final answer (bounded by max_steps).
 
@@ -130,8 +151,6 @@ def run_agent(messages: list[dict], max_steps: int = 8, conversation_id: str | N
         # Run each tool the model picked and feed the result back.
         for c in reply["tool_calls"]:
             print(f"  [agent] calling {c['name']}({c['arguments']})")
-            if conversation_id:
-                record(conversation_id, "agent_decision", {"tool": c["name"], "arguments": c["arguments"]})
             function = TOOLS.get(c["name"])
             if function is None:
                 result = {"error": f"unknown tool: {c['name']}"}
@@ -140,6 +159,14 @@ def run_agent(messages: list[dict], max_steps: int = 8, conversation_id: str | N
                     result = function(**c["arguments"])
                 except Exception as e:  # bad args or tool failure -> tell the model
                     result = {"error": str(e)}
+            # Log the decision AND its real outcome, so the audit trail's "Impact"
+            # shows actual numbers (e.g. the cart total) — not just what was asked.
+            if conversation_id:
+                record(conversation_id, "agent_decision", {
+                    "tool": c["name"],
+                    "arguments": c["arguments"],
+                    "result": _result_summary(c["name"], result),
+                })
             # Remember any products the agent surfaced, so the UI can show cards.
             if conversation_id and c["name"] in ("search_catalog", "recommend") and isinstance(result, list):
                 _last_products[conversation_id] = result

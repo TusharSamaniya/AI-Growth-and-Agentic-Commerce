@@ -202,6 +202,11 @@ async def webhook(request: Request):
     body = await request.body()
     signature = request.headers.get("X-Razorpay-Signature", "")
     if not verify_webhook_signature(body, signature):
+        # A forged or tampered webhook. Log the rejection to a dedicated "system"
+        # audit trail (never a buyer's — the body is attacker-controlled, so filing
+        # it under a real conversation would let an attacker scribble in their
+        # record) so even blocked attacks are on the tamper-evident ledger.
+        record("system", "webhook_rejected", {"reason": "invalid signature"})
         raise HTTPException(status_code=400, detail="invalid signature")
 
     payload = json.loads(body)
