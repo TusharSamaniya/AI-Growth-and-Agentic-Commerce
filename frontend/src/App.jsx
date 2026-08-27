@@ -163,6 +163,7 @@ export default function App() {
   const [paidOrderId, setPaidOrderId] = useState(null);   // which order the live event told us is paid
   const [failedOrderId, setFailedOrderId] = useState(null); // which order the live event told us failed
   const [audit, setAudit] = useState(null);               // this conversation's audit trail (polled live)
+  const [razorpayKey, setRazorpayKey] = useState("");     // public Razorpay Key ID for the on-page modal
 
   // Subscribe to the server's live event stream. When the payment webhook fires,
   // the backend publishes a "payment_received" or "payment_failed" event, and it
@@ -179,6 +180,15 @@ export default function App() {
       }
     };
     return () => es.close(); // close the stream when the page goes away
+  }, []);
+
+  // Fetch the public Razorpay Key ID once, so the embedded Checkout modal can open
+  // with it. It's the publishable key (safe in the browser); the secret stays server-side.
+  useEffect(() => {
+    fetch(`${API}/config`)
+      .then((r) => r.json())
+      .then((c) => setRazorpayKey(c.razorpay_key_id))
+      .catch(() => {}); // if it fails, the Pay button falls back to the payment link
   }, []);
 
   // Poll the audit trail so the side panel stays live as the conversation grows —
@@ -280,6 +290,48 @@ export default function App() {
       setCheckoutError("⚠️ Couldn't start checkout. Please try again.");
     } finally {
       setPaying(false);
+    }
+  }
+
+  // Open Razorpay's embedded Checkout popup for an order. The buyer pays without
+  // leaving the page; on success Razorpay hands us a signed receipt, which we pass
+  // to /payment/verify so the SERVER (not the browser) decides the order is paid.
+  // If the checkout script didn't load, fall back to the hosted payment link.
+  function openRazorpay(ord) {
+    if (!window.Razorpay || !razorpayKey) {
+      window.open(ord.payment_link_url, "_blank"); // graceful fallback: the link still works
+      return;
+    }
+    const rzp = new window.Razorpay({
+      key: razorpayKey,
+      order_id: ord.razorpay_order_id,   // the modal pays against the Razorpay order
+      amount: ord.amount,
+      currency: "INR",
+      name: "CartPilot",
+      description: `Order #${ord.order_id}`,
+      prefill: { email },
+      handler: (resp) => verifyPayment(ord, resp), // Razorpay calls this on success
+    });
+    rzp.open();
+  }
+
+  // Send the modal's signed receipt to the server to verify + mark paid. We trust
+  // the server's answer, not the popup: only a genuine signature flips us to paid.
+  async function verifyPayment(ord, resp) {
+    try {
+      const res = await fetch(`${API}/payment/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: ord.order_id,
+          razorpay_order_id: resp.razorpay_order_id,
+          razorpay_payment_id: resp.razorpay_payment_id,
+          razorpay_signature: resp.razorpay_signature,
+        }),
+      });
+      if (res.ok) setPaidOrderId(ord.order_id); // server verified -> flip to the green panel
+    } catch {
+      // on any failure we stay on "waiting" so the buyer can retry; we never show paid without the server's OK
     }
   }
 
@@ -442,16 +494,14 @@ export default function App() {
           ) : (
             <div style={{ marginTop: 12, textAlign: "center", background: "#fff8e1", border: "1px solid #ffe08a", borderRadius: 8, padding: 12 }}>
               <div style={{ fontWeight: "bold", color: "#a06000", marginBottom: 8 }}>⏳ Waiting for payment…</div>
-              <a
-                href={order.payment_link_url}
-                target="_blank"
-                rel="noreferrer"
-                style={{ display: "block", padding: 10, background: "#2b8a3e", color: "#fff", borderRadius: 8, textDecoration: "none", fontWeight: "bold" }}
+              <button
+                onClick={() => openRazorpay(order)}
+                style={{ display: "block", width: "100%", padding: 10, background: "#2b8a3e", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold" }}
               >
-                Pay {rupees(order.amount)} with Razorpay →
-              </a>
+                Pay {rupees(order.amount)} with Razorpay
+              </button>
               <div style={{ color: "#888", fontSize: 12, marginTop: 8 }}>
-                Order #{order.order_id} · {order.status} — finish paying in the Razorpay window.
+                Order #{order.order_id} · {order.status} — a secure Razorpay window opens on this page.
               </div>
             </div>
           ))}

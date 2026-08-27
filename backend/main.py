@@ -9,12 +9,13 @@ from sqlmodel import Session, select
 
 from backend.agent import active_cart, chat as agent_chat, last_cart, last_products
 from backend.audit import audit_report, record
+from backend.config import settings
 from backend.database import engine
 from backend.events import subscribe, unsubscribe
 from backend.guardrails import GuardrailError
 from backend.metrics import merchant_metrics
 from backend.models import Product
-from backend.payments import apply_webhook_event, create_order, get_payment_status, simulate_payment_outcome, verify_webhook_signature
+from backend.payments import apply_webhook_event, confirm_checkout_payment, create_order, get_payment_status, simulate_payment_outcome, verify_webhook_signature
 from backend.tools import ConfirmationError, save_cart
 
 # Create the FastAPI application. This "app" is what Uvicorn runs.
@@ -39,6 +40,14 @@ app.add_middleware(
 def health():
     # FastAPI turns this dict into a JSON response automatically.
     return {"status": "ok"}
+
+
+# The public Razorpay Key ID for the browser's embedded Checkout modal. This is
+# the PUBLISHABLE key (safe in the frontend by design) — the secret key never
+# leaves the server. Served from settings so it's never hard-coded in the UI.
+@app.get("/config")
+def config():
+    return {"razorpay_key_id": settings.razorpay_key_id}
 
 
 # Return products, optionally filtered by max_price (in paise) and/or category.
@@ -118,8 +127,36 @@ def checkout(request: CheckoutRequest):
         "order_id": order["id"],
         "amount": order["amount"],
         "status": order["status"],
+        "razorpay_order_id": order["razorpay_order_id"],  # the modal opens against this
         "payment_link_url": order["payment_link_url"],
     }
+
+
+# The shape POST /payment/verify expects: our order id, plus the signed receipt
+# the Razorpay Checkout modal hands the browser on success.
+class PaymentVerifyRequest(BaseModel):
+    order_id: int
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+# The embedded Checkout modal reports success IN THE BROWSER, so the browser
+# posts us the signed receipt. This is the money gate for that flow: we verify
+# the signature with our key secret and only then mark the order paid — the twin
+# of /webhook's check, but for the on-page popup. A forged receipt is rejected
+# with 400 and logged to the tamper-evident "system" trail (never a buyer's, as
+# the body is caller-supplied).
+@app.post("/payment/verify")
+def payment_verify(request: PaymentVerifyRequest):
+    result = confirm_checkout_payment(
+        request.order_id, request.razorpay_order_id,
+        request.razorpay_payment_id, request.razorpay_signature,
+    )
+    if "error" in result:
+        record("system", "payment_verify_rejected", {"order_id": request.order_id, "reason": result["error"]})
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 # The polling fallback to the webhook: ask Razorpay for this order's payment-link

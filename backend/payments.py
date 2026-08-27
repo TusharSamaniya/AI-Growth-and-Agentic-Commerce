@@ -119,6 +119,66 @@ def verify_webhook_signature(body: bytes, signature: str) -> bool:
         return False
 
 
+def verify_payment_signature(razorpay_order_id: str, razorpay_payment_id: str, signature: str) -> bool:
+    """True if `signature` is Razorpay's real signature for this order + payment.
+
+    When the embedded Checkout modal succeeds, the BROWSER hands us the order id,
+    payment id and a signature. We never trust the browser's word: Razorpay signs
+    "order_id|payment_id" with HMAC-SHA256 using our key secret, so recomputing it
+    proves the payment is genuine and unaltered. A forger without the secret can't
+    produce a valid signature. Returns False instead of raising so the endpoint
+    can simply reject with 400.
+    """
+    try:
+        _client.utility.verify_payment_signature({
+            "razorpay_order_id": razorpay_order_id,
+            "razorpay_payment_id": razorpay_payment_id,
+            "razorpay_signature": signature,
+        })
+        return True
+    except SignatureVerificationError:
+        return False
+
+
+def confirm_checkout_payment(order_id: int, razorpay_order_id: str,
+                             razorpay_payment_id: str, signature: str) -> dict:
+    """Turn a verified embedded-Checkout payment into a confirmed (paid) order.
+
+    The money gate for the modal flow (the twin of the webhook check): verify the
+    browser-supplied signature FIRST, and only a genuine one advances our order to
+    paid — along a LEGAL edge only, so a double-submit or an already-settled order
+    is a harmless no-op. Records the status change (source "checkout") and nudges
+    live SSE subscribers. Returns {"error": ...} on a bad signature or unknown
+    order so the endpoint can reject with 400.
+    """
+    if not verify_payment_signature(razorpay_order_id, razorpay_payment_id, signature):
+        return {"error": "invalid payment signature"}
+
+    changed = False
+    with Session(engine) as session:
+        order = session.get(Order, order_id)
+        if order is None:
+            return {"error": f"order {order_id} not found"}
+        from_status = order.status
+        conversation_id = order.conversation_id
+        if "paid" in ORDER_TRANSITIONS[order.status]:
+            order.set_status("paid")   # awaiting_payment -> paid (enforcer of legal edges)
+            session.add(order)
+            session.commit()
+            session.refresh(order)
+            changed = True
+        our_status = order.status
+
+    if changed:
+        publish(json.dumps({"type": "payment_received", "order_id": order_id}))
+        if conversation_id:
+            record(conversation_id, "status_change", {
+                "order_id": order_id, "from": from_status, "to": "paid",
+                "razorpay_payment_id": razorpay_payment_id, "source": "checkout",
+            })
+    return {"order_id": order_id, "order_status": our_status}
+
+
 # How Razorpay's payment-link status maps onto our order state machine. Statuses
 # not listed (created, partially_paid) mean "no change yet" — still awaiting.
 RAZORPAY_TO_ORDER_STATUS = {
