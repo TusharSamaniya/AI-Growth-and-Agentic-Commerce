@@ -82,9 +82,9 @@ def build_cart(product_ids: list[int], budget: int | None = None) -> dict:
         for product_id, quantity in quantities.items():
             product = session.get(Product, product_id)  # fetch by primary key
             if product is None:
-                unavailable.append({"product_id": product_id, "reason": "not found"})
+                unavailable.append({"product_id": product_id, "name": None, "reason": "not found"})
             elif product.stock < quantity:
-                unavailable.append({"product_id": product_id, "reason": "out of stock"})
+                unavailable.append({"product_id": product_id, "name": product.name, "reason": "out of stock"})
             else:
                 line_total = product.price * quantity  # paise * count = paise
                 total += line_total

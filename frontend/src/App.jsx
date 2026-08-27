@@ -253,6 +253,14 @@ export default function App() {
       {cart && cart.items && cart.items.length > 0 && (
         <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, marginBottom: 12 }}>
           <h3 style={{ margin: "0 0 8px" }}>Your cart</h3>
+          {/* Items the agent tried to add but couldn't — shown plainly, not silently dropped. */}
+          {cart.unavailable && cart.unavailable.length > 0 && (
+            <div style={{ background: "#fff5f5", border: "1px solid #ffc9c9", borderRadius: 6, padding: "6px 8px", marginBottom: 8, fontSize: 13, color: "#c92a2a" }}>
+              {cart.unavailable.map((u) => (
+                <div key={u.product_id}>🚫 {u.name || `Item #${u.product_id}`} — {u.reason}</div>
+              ))}
+            </div>
+          )}
           {cart.items.map((item) => (
             <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
               <span>{item.name} × {item.quantity}</span>
