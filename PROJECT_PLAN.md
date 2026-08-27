@@ -491,10 +491,10 @@ the safe path — but the choice is yours. Tick the checkboxes as we complete ea
 ### Phase 11 — Polish & impress (stretch — pick what fits)
 *Goal: the extras that lift a good demo to a winning one.*
 - [x] **Task 11.1 — Merchant metrics mini-dashboard** (conversion, avg basket size, upsell attach rate, recovered carts)
-- **Task 11.2 — Merchant guardrail config** (max discount, caps, allowed categories) enforced server-side
-- **Task 11.3 — Handle more failure modes** (out-of-stock, budget exceeded, expired link, duplicate payment, bad webhook signature)
-- **Task 11.4 — Rich explanation rendering** (`{action, params, rationale, expected_impact}`)
-- **Task 11.5 — (stretch) Embedded Razorpay Checkout modal** instead of a link
+- [x] **Task 11.2 — Merchant guardrail config** (max discount, caps, allowed categories) enforced server-side
+- [x] **Task 11.3 — Handle more failure modes** (out-of-stock, budget exceeded, expired link, duplicate payment, bad webhook signature)
+- [x] **Task 11.4 — Rich explanation rendering** (`{action, params, rationale, expected_impact}`)
+- [x] **Task 11.5 — (stretch) Embedded Razorpay Checkout modal** instead of a link
 
 ### Phase 12 — Rehearse & ship
 *Goal: a reliable, repeatable demo.*
