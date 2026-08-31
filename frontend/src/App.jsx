@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
-const API = "http://127.0.0.1:8000";
+// The backend base URL. In production, Vercel injects VITE_API_URL (the deployed
+// Render backend); with none set, local dev falls back to the localhost server.
+const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 // Format a paise integer as rupees, e.g. 899900 -> "₹8,999".
 const rupees = (paise) => `₹${(paise / 100).toLocaleString("en-IN")}`;
