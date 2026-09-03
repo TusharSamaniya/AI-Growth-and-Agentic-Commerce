@@ -21,15 +21,24 @@ from backend.tools import ConfirmationError, save_cart
 # Create the FastAPI application. This "app" is what Uvicorn runs.
 app = FastAPI()
 
+# Build the list of explicitly allowed production origins from the env var
+# (e.g. ALLOWED_ORIGINS=https://ai-growth-and-agentic-commerce-five.vercel.app).
+# Split on commas and strip whitespace so the env var is easy to set on Render.
+_extra_origins: list[str] = (
+    [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+    if settings.allowed_origins
+    else []
+)
+
 # Let the Vite dev frontend (http://localhost:5173) call this API from the
 # browser. Without CORS the browser blocks these cross-origin requests.
+# allow_origins covers the explicit production URLs from the env var.
+# allow_origin_regex covers any localhost port for local development (Vite
+# jumps to 5174/5175/... whenever the previous port is still in use).
 app.add_middleware(
     CORSMiddleware,
-    # Match ANY localhost port (and 127.0.0.1) instead of hard-coding 5173. Vite
-    # jumps to 5174/5175/... whenever the previous port is still in use, and the
-    # dev page can be opened as either localhost or 127.0.0.1 — pinning one port
-    # silently blocks the browser (the "Couldn't reach the agent" trap).
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+    allow_origins=_extra_origins,          # production Vercel URL(s) from env
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",  # local dev
     allow_methods=["*"],
     allow_headers=["*"],
 )
