@@ -21,26 +21,20 @@ from backend.tools import ConfirmationError, save_cart
 # Create the FastAPI application. This "app" is what Uvicorn runs.
 app = FastAPI()
 
-# Build the list of explicitly allowed production origins from the env var
-# (e.g. ALLOWED_ORIGINS=https://ai-growth-and-agentic-commerce-five.vercel.app).
-# Split on commas and strip whitespace so the env var is easy to set on Render.
-_extra_origins: list[str] = (
-    [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
-    if settings.allowed_origins
-    else []
-)
-
-# Let the Vite dev frontend (http://localhost:5173) call this API from the
-# browser. Without CORS the browser blocks these cross-origin requests.
-# allow_origins covers the explicit production URLs from the env var.
-# allow_origin_regex covers any localhost port for local development (Vite
-# jumps to 5174/5175/... whenever the previous port is still in use).
+# CORS: allow the browser to call this API from:
+#   - any *.vercel.app subdomain  (covers the production deployment AND every
+#     Vercel preview URL like *-tushar29.vercel.app that Vercel auto-generates)
+#   - any localhost / 127.0.0.1 port for local development
+# A single allow_origin_regex covers both cases so no env var is needed.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_extra_origins,          # production Vercel URL(s) from env
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",  # local dev
+    allow_origin_regex=(
+        r"https://[\w\-]+\.vercel\.app"           # any vercel.app subdomain (https)
+        r"|http://(localhost|127\.0\.0\.1):\d+"   # any localhost port (http)
+    ),
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=False,
 )
 
 

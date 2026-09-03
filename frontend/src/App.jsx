@@ -166,6 +166,26 @@ export default function App() {
   const [failedOrderId, setFailedOrderId] = useState(null); // which order the live event told us failed
   const [audit, setAudit] = useState(null);               // this conversation's audit trail (polled live)
   const [razorpayKey, setRazorpayKey] = useState("");     // public Razorpay Key ID for the on-page modal
+  const [backendReady, setBackendReady] = useState(false); // false = backend still waking up (Render free tier)
+
+  // Wake the backend as soon as the page loads. Render's free tier spins down after
+  // inactivity and takes up to 60 s to cold-start. Hitting /health immediately means
+  // the server is warm by the time the user sends their first message.
+  useEffect(() => {
+    let cancelled = false;
+    async function wake() {
+      for (let i = 0; i < 20; i++) {          // retry for up to ~60 s
+        try {
+          const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(5000) });
+          if (r.ok && !cancelled) { setBackendReady(true); return; }
+        } catch { /* still waking — ignore and retry */ }
+        await new Promise(res => setTimeout(res, 3000)); // wait 3 s between pings
+      }
+      if (!cancelled) setBackendReady(true);   // give up waiting; let the user try anyway
+    }
+    wake();
+    return () => { cancelled = true; };
+  }, []);
 
   // Subscribe to the server's live event stream. When the payment webhook fires,
   // the backend publishes a "payment_received" or "payment_failed" event, and it
@@ -249,10 +269,13 @@ export default function App() {
     setInput("");
     setBusy(true);
     try {
+      // 90-second timeout: Render free tier can take up to 60 s to cold-start,
+      // plus the LLM call itself. Without this the browser would hang silently.
       const res = await fetch(`${API}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversation_id: cid, message: text }),
+        signal: AbortSignal.timeout(90000),
       });
       if (!res.ok) throw new Error("bad status");
       const data = await res.json();
@@ -262,8 +285,14 @@ export default function App() {
         setCart(data.cart);
         setOrder(null); // a new cart makes any earlier payment link stale
       }
-    } catch {
-      setMessages((prev) => [...prev, { role: "assistant", text: "⚠️ Couldn't reach the agent. Please try again." }]);
+    } catch (err) {
+      const timedOut = err?.name === "TimeoutError" || err?.name === "AbortError";
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        text: timedOut
+          ? "⏳ The server is taking a while to wake up (Render free tier). Please send your message again in a few seconds."
+          : "⚠️ Couldn't reach the agent. Please try again.",
+      }]);
     } finally {
       setBusy(false);
     }
@@ -369,6 +398,13 @@ export default function App() {
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: 24, fontFamily: "sans-serif" }}>
       <h1 style={{ marginBottom: 16 }}>CartPilot</h1>
+
+      {/* Cold-start banner: shown while backend is waking up on Render free tier. */}
+      {!backendReady && (
+        <div style={{ background: "#fff8e1", border: "1px solid #ffe08a", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontSize: 14, color: "#a06000" }}>
+          ⏳ <strong>Connecting to server…</strong> The backend is waking up (Render free tier can take ~30–60 s on first load). Please wait before sending a message.
+        </div>
+      )}
 
       {/* Merchant metrics: four live KPIs across the top for the judges. */}
       <MetricsStrip metrics={metrics} />
@@ -510,15 +546,19 @@ export default function App() {
         </div>
       )}
 
-      {/* Input box: Enter or the Send button submits the form */}
+      {/* Input box: Enter or the Send button submits the form.
+          Disabled while the backend is still waking up to avoid the "Couldn't reach" error. */}
       <form onSubmit={(e) => { e.preventDefault(); send(); }} style={{ display: "flex", gap: 8 }}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a message…"
-          style={{ flex: 1, padding: 8 }}
+          placeholder={backendReady ? "Type a message…" : "Waiting for server to wake up…"}
+          disabled={!backendReady}
+          style={{ flex: 1, padding: 8, opacity: backendReady ? 1 : 0.6 }}
         />
-        <button type="submit" disabled={busy} style={{ padding: "8px 16px" }}>Send</button>
+        <button type="submit" disabled={busy || !backendReady} style={{ padding: "8px 16px" }}>
+          {backendReady ? "Send" : "⏳"}
+        </button>
       </form>
       </div>
 
